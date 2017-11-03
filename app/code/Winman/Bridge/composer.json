@@ -1,0 +1,21 @@
+{
+  "name": "Winman_Bridge",
+  "description": "Extension to integrate WinMan and Magento 2.1",
+  "authors": [
+    {
+       "name": "Lynn Eagleton",
+       "email": "lynn.eagleton@winman.com"
+    }
+  ],
+  "require": {
+    "php": "~5.5.0|~5.6.0|~7.0.0"
+  },
+  "type": "magento2-module",
+  "version": "1.0.0",
+  "autoload": {
+    "files": [ "registration.php" ],
+    "psr-4": {
+      "Winman\\Bridge\\": ""
+    }
+  }
+}

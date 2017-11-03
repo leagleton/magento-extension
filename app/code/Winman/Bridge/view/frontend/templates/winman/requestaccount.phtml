@@ -1,0 +1,142 @@
+<?php
+if ($this->isBridgeEnabled()) {
+    ?>
+    <div class="winman-request-account">
+        <form class="form create account form-create-account"
+              action="<?php echo $this->getFormAction(); ?>" method="post" id="form-validate" name="form-validate"
+              data-hasrequired="<?php echo __('* Required Fields'); ?>" data-mage-init='{"validation":{}}'
+              enctype="multipart/form-data" novalidate="novalidate" autocomplete="off">
+            <fieldset class="fieldset create info">
+                <legend class="legend"><span><?php echo __('Your Information'); ?></span></legend>
+                <br/>
+                <input type="hidden" name="success_url" value="">
+                <input type="hidden" name="error_url" value="">
+                <div class="field required">
+                    <label class="label" for="firstname">
+                        <span><?php echo __('First Name'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="firstname" name="firstname" value="" title="First Name"
+                               class="input-text" data-validate="{required:true}" autocomplete="off"
+                               aria-required="true">
+                    </div>
+                </div>
+                <div class="field required">
+                    <label class="label" for="lastname">
+                        <span><?php echo __('Last Name'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="lastname" name="lastname" value="" title="Last Name"
+                               class="input-text" data-validate="{required:true}" autocomplete="off"
+                               aria-required="true">
+                    </div>
+                </div>
+                <div class="field required">
+                    <label class="label" for="email_address">
+                        <span><?php echo __('Email'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="email" id="email_address" name="email_address" value="" title="Email"
+                               class="input-text" data-validate="{required:true, 'validate-email':true}"
+                               autocomplete="email" aria-required="true">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="phone_number">
+                        <span><?php echo __('Phone Number'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="phone_number" name="phone_number" value="" title="Phone Number"
+                               autocomplete="off" class="input-text" aria-required="false">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="job_title">
+                        <span><?php echo __('Job Title'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="job_title" name="job_title" value="" title="Job Title"
+                               autocomplete="off" class="input-text" aria-required="false">
+                    </div>
+                </div>
+                <div class="field required">
+                    <label class="label" for="address">
+                        <span><?php echo __('Address'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="address" name="address" value="" title="Address"
+                               class="input-text" data-validate="{required:true}"
+                               autocomplete="off" aria-required="true">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="city">
+                        <span><?php echo __('City'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="city" name="city" value="" title="city"
+                               class="input-text" autocomplete="off" aria-required="false">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="region">
+                        <span><?php echo __('Region'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="region" name="region" value="" title="region"
+                               class="input-text" autocomplete="off" aria-required="false">
+                    </div>
+                </div>
+                <div class="field required">
+                    <label class="label" for="postal_code">
+                        <span><?php echo __('Postal Code'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <input type="text" id="postal_code" name="postal_code" value="" title="Postal Code"
+                               class="input-text" data-validate="{required:true}" autocomplete="off"
+                               aria-required="true">
+                    </div>
+                </div>
+                <div class="field required">
+                    <label class="label" for="country">
+                        <span><?php echo __('Country'); ?></span>
+                    </label>
+
+                    <div class="control">
+                        <select name="country" id="country" class="" title="Country"
+                                data-validate="{'validate-select':true}">
+                            <?php echo $this->getCountries(); ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="field choice newsletter">
+                    <input type="checkbox" name="allow_communication" title="Allow Communication" value="1"
+                           id="allow_communication" class="checkbox">
+                    <label for="allow_communication"
+                           class="label"><span><?php echo __('Allow Communication'); ?></span></label>
+                </div>
+            </fieldset>
+
+            <div class="actions-toolbar">
+                <div class="primary">
+                    <button type="submit" class="action submit primary" title="Create an Account">
+                        <span><?php echo __('Request an Account'); ?></span></button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <?php
+} else {
+    echo __('This website is not currently accepting new account requests.');
+}
+?>
+

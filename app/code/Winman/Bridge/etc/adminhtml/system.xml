@@ -1,0 +1,141 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="../../../../Magento/Config/etc/system_file.xsd">
+    <system>
+        <tab id="winman" translate="label" sortOrder="10">
+            <label>WinMan</label>
+        </tab>
+        <section id="winman_bridge" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
+                 showInStore="0">
+            <label>WinMan Data Bridge</label>
+            <tab>winman</tab>
+            <resource>Winman_Bridge::winman_bridge</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
+                   showInStore="1">
+                <label>General</label>
+                <field id="enable" translate="label comment" type="select" sortOrder="10" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Enable Data Bridge?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'No' is selected above, no information will be passed between WinMan and Magento.
+                    </comment>
+                </field>
+                <field id="api_baseurl" translate="label comment" type="text" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>API Base URL</label>
+                    <comment>
+                        The base URL of your WinMan REST API.
+                    </comment>
+                </field>
+                <field id="winman_website" translate="label comment" type="text" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Website URL</label>
+                    <comment>
+                        The URL of your Magento website as it appears in WinMan.
+                    </comment>
+                </field>
+                <field id="access_token" translate="label comment" type="textarea" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>API Access Token</label>
+                    <comment>
+                        A valid access token for your WinMan REST API.
+                    </comment>
+                </field>
+            </group>
+            <group id="products" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
+                   showInStore="0">
+                <label>Products</label>
+                <field id="enable_products" translate="label comment" type="select" sortOrder="10" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Fetch Products from WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, product information will be populated in Magento from WinMan.
+                    </comment>
+                </field>
+                <field id="enable_stock" translate="label comment" type="select" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Fetch Product Stock Levels from WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, product stock information will be populated in Magento from WinMan.
+                    </comment>
+                </field>
+                <field id="enable_product_images" translate="label comment" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Fetch Product Images from WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, product images will be populated in Magento from WinMan along with
+                        product information. If you have set 'Fetch Products from WinMan?' to 'No', this setting will be
+                        ignored and images will not be populated.
+                    </comment>
+                </field>
+                <field id="enable_product_categories" translate="label comment" type="select" sortOrder="40"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Fetch Product Categories from WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, product category information will be populated in Magento from
+                        WinMan.
+                    </comment>
+                </field>
+                <field id="full_product_update" translate="label comment" type="select" sortOrder="50" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Perform Full Product Update?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, a full product update will be conducted the next time the cron runs.
+                        This setting will automatically revert back to 'No' once the full update has completed. If
+                        'Fetch Product Images from WinMan?' is set to 'Yes', product images will be included in this
+                        full update.
+                    </comment>
+                </field>
+                <field id="full_product_category_update" translate="label comment" type="select" sortOrder="56"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Perform Full Product Category Update?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, a full product category update will be conducted the next time the
+                        cron runs. This setting will automatically revert back to 'No' once the full update has
+                        completed.
+                    </comment>
+                </field>
+            </group>
+            <group id="customers" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
+                   showInStore="0">
+                <label>Customers</label>
+                <field id="enable_customers" translate="label comment" type="select" sortOrder="10" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Fetch Customers from WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, customer information will be populated in Magento from WinMan.
+                    </comment>
+                </field>
+                <field id="full_customer_update" translate="label comment" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Perform Full Customer Update?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, a full customer update will be conducted the next time the cron
+                        runs. This setting will automatically revert back to 'No' once the full update has completed.
+                    </comment>
+                </field>
+            </group>
+            <group id="sales_orders" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
+                   showInStore="0">
+                <label>Sales Orders</label>
+                <field id="enable_salesorders" translate="label comment" type="select" sortOrder="10" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Push Sales Orders back to WinMan?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, any order placed in Magento will be automatically sent to WinMan.
+                    </comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
