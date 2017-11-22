@@ -63,7 +63,7 @@
                     </comment>
                 </field>
                 <field id="enable_product_images" translate="label comment" type="select" sortOrder="30"
-                       showInDefault="1" showInWebsite="0" showInStore="0">
+                       showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Fetch Product Images from WinMan?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>
