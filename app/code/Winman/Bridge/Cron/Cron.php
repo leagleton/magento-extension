@@ -36,6 +36,7 @@ use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
 use \Magento\Store\Model\ScopeInterface;
+use \Magento\Catalog\Model\Product\WebsiteFactory AS ProductWebsiteFactory;
 
 /**
  * Class Cron
@@ -97,6 +98,8 @@ class Cron
     protected $_filterBuilder;
     protected $_searchCriteriaBuilder;
 
+    protected $_productWebsiteFactory;
+
     private $_mediaPath;
     private $_lastExecutedTimestamp;
     private $_websites;
@@ -134,6 +137,7 @@ class Cron
      * @param ConfigInterface $configInterface
      * @param FilterBuilder $filterBuilder
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param ProductWebsiteFactory $productWebsiteFactory
      */
     public function __construct(
         Logger $logger,
@@ -165,7 +169,8 @@ class Cron
         EavConfig $eavConfig,
         ConfigInterface $configInterface,
         FilterBuilder $filterBuilder,
-        SearchCriteriaBuilder $searchCriteriaBuilder)
+        SearchCriteriaBuilder $searchCriteriaBuilder,
+        ProductWebsiteFactory $productWebsiteFactory)
     {
         $this->_logger = $logger;
         $this->_helper = $helper;
@@ -204,6 +209,8 @@ class Cron
         $this->_configInterface = $configInterface;
         $this->_filterBuilder = $filterBuilder;
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
+
+        $this->_productWebsiteFactory = $productWebsiteFactory;
 
         $this->_mediaPath = $this->_fileSystem->getDirectoryRead(DirectoryList::MEDIA)->getAbsolutePath();
         $this->_lastExecutedTimestamp = $this->getLastExecutedTimestamp();
@@ -498,6 +505,10 @@ class Cron
     {
         $stores = $this->_storeRepository->getList();
 
+        // Using _productRepository->save() at global scope forces product to be saved to all websites.
+        // We don't necessarily want this, so we need to keep track of which website(s) the product belongs to.
+        $websiteIds = [];
+
         // Find the correct tax class ID.
         $taxClasses = $this->_taxClassCollectionFactory->create()
             ->addFieldToFilter('class_type', 'PRODUCT');
@@ -508,43 +519,21 @@ class Cron
             $taxClasses->addFieldToFilter('class_name', 'Default');
         }
 
-        $taxClassId = ($data->Taxable) ? $taxClasses->getFirstItem()->getId() : 0;        
+        $taxClassId = ($data->Taxable) ? $taxClasses->getFirstItem()->getId() : 0;
         $taxClassId = ($taxClassId) ? $taxClassId : 0;
 
         // If product already exists, update it.
-        if ($product = $this->_productRepository->get($data->Sku)) {
+        if ($this->_productModel->getIdBySku($data->Sku)) {
+            $product = $this->_productRepository->get($data->Sku);
+            $websiteIds = $product->getWebsiteIds();
             $product = $this->setProductData($product, $data, $taxClassId, false);
         } else { // Otherwise, create a new one.
             $product = $this->_productFactory->create();
             $product = $this->setProductData($product, $data, $taxClassId, true);
         }
 
-        // Ensure that all attributes we use have 'Use Default Value' checked for all stores.
-        foreach ($stores as $store) {
-            if ($store["website_id"] == $this->_currentWebsite->getId() && $store["name"] !== 'Admin') {
-                try {
-                    $this->_productAction->updateAttributes(
-                        [$product->getId()],
-                        [
-                            'status' => '',
-                            'name' => '',
-                            'description' => '',
-                            'short_description' => '',
-                            'tax_class_id' => '',
-                            'special_from_date' => '',
-                            'special_to_date' => '',
-                            'visibility' => '',
-                            'url_key' => '',
-                            'meta_title' => '',
-                            'meta_keyword' => '',
-                            'meta_description' => ''
-                        ],
-                        $store["store_id"]);
-                } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
-                }
-            }
-        }
+        $websiteIds[] = $this->_currentWebsite->getId();
+        $websiteIds = array_unique($websiteIds);
 
         if ($this->_ENABLE_IMAGES) {
             // Remove existing images.
@@ -556,6 +545,7 @@ class Cron
 
             try {
                 $product = $this->_productRepository->save($product);
+                $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
             } catch (\Exception $e) {
                 $this->_logger->critical($e->getMessage());
             }
@@ -571,6 +561,13 @@ class Cron
             // Set stock level.
             $this->fetchStockLevels($data->Sku);
         }
+
+        try {
+            // Remove the product from any unecessary websites.
+            $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
+        } catch (\Exception $e) {
+            $this->_logger->critical($e->getMessage());
+        }
     }
 
     /**
@@ -583,7 +580,6 @@ class Cron
     private function setProductData($product, $data, $taxClassId, $isNew = false)
     {
         $defaultAttributeSetId = $this->getDefaultProductAttributeSetId();
-        $websiteIds = [];
 
         $product
             ->setAttributeSetId($defaultAttributeSetId)
@@ -614,12 +610,7 @@ class Cron
 
         if ($isNew) {
             $product->setSku($data->Sku);
-        } else {
-            $websiteIds = $product->getWebsiteIds();
         }
-
-        $websiteIds[] = $this->_currentWebsite->getId();
-        $product->setWebsiteIds($websiteIds);
 
         try {
             $product = $this->_productRepository->save($product);
