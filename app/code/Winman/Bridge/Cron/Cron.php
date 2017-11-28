@@ -18,6 +18,7 @@ use \Magento\Catalog\Model\CategoryFactory;
 use \Magento\Catalog\Model\CategoryRepository;
 use \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
 use \Magento\Catalog\Api\CategoryLinkManagementInterface;
+use \Magento\Customer\Model\Customer as CustomerModel;
 use \Magento\Customer\Model\CustomerFactory as CustomerFactory;
 use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
 use \Magento\Customer\Model\ResourceModel\Group\Collection as CustomerGroupCollection;
@@ -75,6 +76,7 @@ class Cron
     protected $_categoryCollectionFactory;
     protected $_categoryLinkManagement;
 
+    protected $_customerModel;
     protected $_customerFactory;
     protected $_customerRepository;
     protected $_customerGroupCollection;
@@ -119,6 +121,7 @@ class Cron
      * @param CategoryRepository $categoryRepository
      * @param CollectionFactory $categoryCollectionFactory
      * @param CategoryLinkManagementInterface $categoryLinkManagement
+     * @param CustomerModel $customerModel
      * @param CustomerFactory $customerFactory
      * @param CustomerRepository $customerRepository
      * @param CustomerGroupCollection $customerGroupCollection
@@ -152,6 +155,7 @@ class Cron
         CategoryRepository $categoryRepository,
         CollectionFactory $categoryCollectionFactory,
         CategoryLinkManagementInterface $categoryLinkManagement,
+        CustomerModel $customerModel,
         CustomerFactory $customerFactory,
         CustomerRepository $customerRepository,
         CustomerGroupCollection $customerGroupCollection,
@@ -187,6 +191,7 @@ class Cron
         $this->_categoryCollectionFactory = $categoryCollectionFactory;
         $this->_categoryLinkManagement = $categoryLinkManagement;
 
+        $this->_customerModel = $customerModel;
         $this->_customerFactory = $customerFactory;
         $this->_customerRepository = $customerRepository;
         $this->_customerGroupCollection = $customerGroupCollection;
@@ -877,7 +882,9 @@ class Cron
 
             $groupId = ($groupId) ? $groupId : 1;
 
-            if ($customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId())) {
+            if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
+                $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
+
                 $customer
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
@@ -903,7 +910,6 @@ class Cron
                     ->setPassword('abc123#ABC');
 
                 try {
-//                $this->_customerRepository->save($customer); // TODO: figure out a way to use repository to save!! This doesn't work :(.
                     $customer = $customer->save();
                 } catch (\Exception $e) {
                     $this->_logger->critical($e->getMessage());
