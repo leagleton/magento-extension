@@ -694,6 +694,11 @@ class Cron
         // Save image to file
         $fileName = null;
         if (!empty($data->CategoryImage)) {
+
+            if (!file_exists($this->_mediaPath . 'catalog/category')) {
+                mkdir($this->_mediaPath . 'catalog/category', 0777, true);
+            }
+
             $imageData = base64_decode($data->CategoryImage);
             $f = finfo_open();
             $mime_type = finfo_buffer($f, $imageData, FILEINFO_MIME_TYPE);
