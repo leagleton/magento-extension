@@ -460,7 +460,7 @@ class Cron
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_PRODUCT_UPDATE) {
+        if (!$this->_FULL_CATEGORY_UPDATE) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
@@ -488,7 +488,7 @@ class Cron
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_PRODUCT_UPDATE) {
+        if (!$this->_FULL_CUSTOMER_UPDATE) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
