@@ -362,8 +362,6 @@ class Cron
         $curl = curl_init($apiUrl);
         curl_setopt($curl, CURLOPT_HTTPHEADER, $this->_CURL_HEADERS);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false); // TODO: get rid of this!
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false); // TODO: get rid of this!
         $response = curl_exec($curl);
 
         if (!$response) {
@@ -786,7 +784,7 @@ class Cron
         } else if (isset($existingCategoryId)) {
             // Update existing category.
 
-            // TODO: check path is correct. If not, correct it?
+            // TODO: check path is correct. If not, correct it.
             $existingCategory = $this->_categoryRepository
                 ->get($existingCategoryId)
                 ->setUrlKey(urlencode($data->CategoryName))
@@ -811,8 +809,8 @@ class Cron
             $this->populateCategoryProducts($data->Products, $existingCategoryId);
         }
 
-        // TODO: remove products that are no longer in the category in WinMan??
-        // TODO: remove categories that no longer exist in WinMan??
+        // TODO: remove products that are no longer in the category in WinMan.
+        // TODO: remove categories that no longer exist in WinMan.
     }
 
     /**
