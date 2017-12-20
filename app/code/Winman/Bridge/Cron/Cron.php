@@ -10,6 +10,7 @@ use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
 use \Magento\Catalog\Model\Product\Action as ProductAction;
 use \Magento\Catalog\Api\Data\ProductAttributeInterface;
+use \Magento\Catalog\Api\ProductTierPriceManagementInterface as TierPrice;
 use \Magento\CatalogInventory\Api\StockRegistryInterface;
 use \Magento\Framework\App\Filesystem\DirectoryList;
 use \Magento\Framework\Filesystem;
@@ -21,7 +22,10 @@ use \Magento\Catalog\Api\CategoryLinkManagementInterface;
 use \Magento\Customer\Model\Customer as CustomerModel;
 use \Magento\Customer\Model\CustomerFactory as CustomerFactory;
 use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
-use \Magento\Customer\Model\ResourceModel\Group\Collection as CustomerGroupCollection;
+use \Magento\Customer\Model\ResourceModel\Group\CollectionFactory as CustomerGroupCollectionFactory;
+use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
+use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
+use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Model\AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
 use \Magento\Store\Model\StoreRepository;
@@ -68,6 +72,7 @@ class Cron
     protected $_productFactory;
     protected $_productRepository;
     protected $_productAction;
+    protected $_tierPrice;
     protected $_stockRegistry;
 
     protected $_categoryModel;
@@ -79,7 +84,10 @@ class Cron
     protected $_customerModel;
     protected $_customerFactory;
     protected $_customerRepository;
-    protected $_customerGroupCollection;
+    protected $_customerGroupCollectionFactory;
+    protected $_customerGroupRepository;
+    protected $_customerGroupFactory;
+    protected $_groupManagementInterface;
     protected $_addressFactory;
     protected $_addressRepository;
 
@@ -115,6 +123,7 @@ class Cron
      * @param ProductFactory $productFactory
      * @param ProductRepository $productRepository
      * @param ProductAction $productAction
+     * @param TierPrice $tierPrice
      * @param StockRegistryInterface $stockRegistry
      * @param Category $categoryModel
      * @param CategoryFactory $categoryFactory
@@ -124,7 +133,10 @@ class Cron
      * @param CustomerModel $customerModel
      * @param CustomerFactory $customerFactory
      * @param CustomerRepository $customerRepository
-     * @param CustomerGroupCollection $customerGroupCollection
+     * @param CustomerGroupCollectionFactory $customerGroupCollectionFactory
+     * @param CustomerGroupRepository $customerGroupRepository
+     * @param CustomerGroupFactory $customerGroupFactory
+     * @param GroupManagementInterface $groupManagementInterface
      * @param AddressFactory $addressFactory
      * @param AddressRepository $addressRepository
      * @param StoreRepository $storeRepository
@@ -149,6 +161,7 @@ class Cron
         ProductFactory $productFactory,
         ProductRepository $productRepository,
         ProductAction $productAction,
+        TierPrice $tierPrice,
         StockRegistryInterface $stockRegistry,
         Category $categoryModel,
         CategoryFactory $categoryFactory,
@@ -158,7 +171,10 @@ class Cron
         CustomerModel $customerModel,
         CustomerFactory $customerFactory,
         CustomerRepository $customerRepository,
-        CustomerGroupCollection $customerGroupCollection,
+        CustomerGroupCollectionFactory $customerGroupCollectionFactory,
+        CustomerGroupRepository $customerGroupRepository,
+        CustomerGroupFactory $customerGroupFactory,
+        GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
         StoreRepository $storeRepository,
@@ -183,6 +199,7 @@ class Cron
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
         $this->_productAction = $productAction;
+        $this->_tierPrice = $tierPrice;
         $this->_stockRegistry = $stockRegistry;
 
         $this->_categoryModel = $categoryModel;
@@ -194,7 +211,10 @@ class Cron
         $this->_customerModel = $customerModel;
         $this->_customerFactory = $customerFactory;
         $this->_customerRepository = $customerRepository;
-        $this->_customerGroupCollection = $customerGroupCollection;
+        $this->_customerGroupCollectionFactory = $customerGroupCollectionFactory;
+        $this->_customerGroupRepository = $customerGroupRepository;
+        $this->_customerGroupFactory = $customerGroupFactory;
+        $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
 
@@ -502,6 +522,21 @@ class Cron
     }
 
     /**
+     * @param $guid
+     * @return mixed
+     */
+    private function fetchCustomerPriceList($guid)
+    {
+        $apiUrl = $this->_API_BASEURL . '/customerpricelists?website='
+            . urlencode($this->_WINMAN_WEBSITE)
+            . '&guid=' . $guid;
+
+        $response = $this->executeCurl($apiUrl);
+
+        return $response;
+    }
+
+    /**
      * @param $data
      */
     private function updateProductCatalog($data)
@@ -535,8 +570,39 @@ class Cron
             $product = $this->setProductData($product, $data, $taxClassId, true);
         }
 
+        // Add product prices from Price Lists.
+        foreach ($data->ProductPriceLists as $priceList) {
+            if (isset($priceList->ProductPrices[0]->PriceValue)) {
+                $now = time();
+                $start = strtotime($priceList->ProductPrices[0]->EffectiveDateStart);
+                $end = strtotime($priceList->ProductPrices[0]->EffectiveDateEnd);
+
+                // Make sure a customer group exists with the same name as the price list.
+                $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
+
+                // Check if tier already exists. If not, add it.
+                $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : intval($priceList->ProductPrices[0]->Quantity);
+
+                if ($now < $end && $now > $start) {
+                    $this->_tierPrice->add(
+                        $data->Sku,
+                        $customerGroupId,
+                        $priceList->ProductPrices[0]->PriceValue,
+                        $quantity
+                    );
+                } else {
+                    $this->_tierPrice->remove(
+                        $data->Sku,
+                        $customerGroupId,
+                        $quantity
+                    );
+                }
+            }
+        }
+
         $websiteIds[] = $this->_currentWebsite->getId();
         $websiteIds = array_unique($websiteIds);
+        $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
 
         if ($this->_ENABLE_IMAGES) {
             // Remove existing images.
@@ -548,7 +614,6 @@ class Cron
 
             try {
                 $product = $this->_productRepository->save($product);
-                $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
             } catch (\Exception $e) {
                 $this->_logger->critical($e->getMessage());
             }
@@ -566,7 +631,7 @@ class Cron
         }
 
         try {
-            // Remove the product from any unecessary websites.
+            // Remove the product from any unnecessary websites.
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
             $this->_logger->critical($e->getMessage());
@@ -682,6 +747,49 @@ class Cron
         } catch (\Exception $e) {
             $this->_logger->critical($e->getMessage());
         }
+    }
+
+    /**
+     * @param null $groupName
+     * @return int|null
+     */
+    private function getCustomerGroupId($groupName = null)
+    {
+        // If group name is null, get the default customer group, else, check if group exists.
+        if (is_null($groupName)) {
+            $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
+            $groupId = $this->_groupManagementInterface
+                ->getDefaultGroup($defaultStoreId)
+                ->getId();
+
+            return $groupId;
+        }
+
+        $groupId = $this->_customerGroupCollectionFactory
+            ->create()
+            ->addFieldToFilter('customer_group_code', $groupName)
+            ->getFirstItem()
+            ->getId();
+
+        // If the customer group does not exist, create it.
+        if (!$groupId) {
+            $taxClasses = $this->_taxClassCollectionFactory->create()
+                ->addFieldToFilter('class_type', 'CUSTOMER')
+                ->addFieldToFilter('class_name', 'Retail Customer');
+
+            $taxClassId = $taxClasses->getFirstItem()->getId();
+            $taxClassId = ($taxClassId) ? $taxClassId : 0;
+
+            $group = $this->_customerGroupFactory->create();
+            $group->setCode($groupName)
+                ->setTaxClassId($taxClassId);
+
+            $group = $this->_customerGroupRepository->save($group);
+
+            $groupId = $group->getId();
+        }
+
+        return $groupId;
     }
 
     /**
@@ -878,12 +986,14 @@ class Cron
         foreach ($data->Contacts as $contact) {
             $allowCommunication = ($contact->AllowCommunication) ? 1 : 0;
 
-            $groupId = $this->_customerGroupCollection
-                ->addFieldToFilter('customer_group_code', $data->TaxCode->TaxCodeId)
-                ->getFirstItem()
-                ->getId();
+            $priceList = $this->fetchCustomerPriceList($data->Guid);
+            if (isset($priceList->CustomerPriceLists[0]->PriceList->PriceListId)) {
+                $priceListId = $priceList->CustomerPriceLists[0]->PriceList->PriceListId;
+            } else {
+                $priceListId = null;
+            }
 
-            $groupId = ($groupId) ? $groupId : 1;
+            $groupId = $this->getCustomerGroupId($priceListId);
 
             if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
