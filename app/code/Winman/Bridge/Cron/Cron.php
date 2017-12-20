@@ -432,12 +432,6 @@ class Cron
             . urlencode($this->_WINMAN_WEBSITE)
             . '&sku=' . urlencode($sku);
 
-        $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
-
-        if (!$this->_FULL_PRODUCT_UPDATE) {
-            $apiUrl .= '&modified=' . $seconds;
-        }
-
         $response = $this->executeCurl($apiUrl);
 
         if (count($response->ProductAttachments) > 0) {
@@ -698,7 +692,7 @@ class Cron
         if ($imageData->Type === 'WebImages') {
 
             if (!file_exists($this->_mediaPath . 'importedImages')) {
-                mkdir($this->_mediaPath . 'importedImages', 0777, true);
+                mkdir($this->_mediaPath . 'importedImages', 0775, true);
             }
 
             $imagePath = 'importedImages/' . $imageData->FileName;
@@ -707,16 +701,29 @@ class Cron
             fwrite($imageFile, base64_decode($imageData->Data));
             fclose($imageFile);
 
-            if (!empty($product->getThumbnail())) {
-                $product->addImageToMediaGallery($imagePath, null, false, false);
-            } else {
-                $product->addImageToMediaGallery($imagePath, array('image', 'small_image', 'thumbnail'), false, false);
-            }
+            $product->addImageToMediaGallery($imagePath, null, true, false);
 
             try {
                 $product->save();
             } catch (\Exception $e) {
                 $this->_logger->critical($e->getMessage());
+            }
+
+            if ($product->getThumbnail() == 'no_selection') {
+                $images = $product->getMediaGalleryImages();
+
+                foreach ($images as $image) {
+                    $product->setImage($image['file']);
+                    $product->setThumbnail($image['file']);
+                    $product->setSmallImage($image['file']);
+                    break;
+                }
+
+                try {
+                    $product->save();
+                } catch (\Exception $e) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
         }
     }
