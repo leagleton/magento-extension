@@ -1006,10 +1006,12 @@ class Cron
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
 
                 $customer
+                    ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
                     ->setData('allow_communication', $allowCommunication)
                     ->setDisableAutoGroupChange(1)
+                    ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId);
                 try {
                     $customer = $this->_customerRepository->save($customer);
@@ -1022,10 +1024,12 @@ class Cron
                 $customer->setWebsiteId($this->_currentWebsite->getId())
                     ->setGuid($data->Guid)
                     ->setEmail($contact->WebsiteUserName)
+                    ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
                     ->setAllowCommunication($allowCommunication)
                     ->setDisableAutoGroupChange(1)
+                    ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId)
                     ->setPassword('abc123#ABC');
 
@@ -1056,6 +1060,7 @@ class Cron
             $address = $this->_addressFactory->create();
 
             $address->setCustomerId($customer->getId())
+                ->setPrefix($contact->Title)
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
                 ->setStreet($data->Address)
@@ -1063,7 +1068,7 @@ class Cron
                 ->setRegion($region)
                 ->setPostcode($data->PostalCode)
                 ->setTelephone($telephone)
-                ->setCountryId(substr($data->Country, 0, -1))// TODO: look up iso2 properly.
+                ->setCountryId($data->Country)
                 ->setIsDefaultBilling(1)
                 ->setIsDefaultShipping(1)
                 ->setSaveInAddressBook(1);
