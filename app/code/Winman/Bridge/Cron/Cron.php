@@ -10,7 +10,6 @@ use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
 use \Magento\Catalog\Model\Product\Action as ProductAction;
 use \Magento\Catalog\Api\Data\ProductAttributeInterface;
-use \Magento\Catalog\Api\ProductTierPriceManagementInterface as TierPrice;
 use \Magento\CatalogInventory\Api\StockRegistryInterface;
 use \Magento\Framework\App\Filesystem\DirectoryList;
 use \Magento\Framework\Filesystem;
@@ -72,7 +71,6 @@ class Cron
     protected $_productFactory;
     protected $_productRepository;
     protected $_productAction;
-    protected $_tierPrice;
     protected $_stockRegistry;
 
     protected $_categoryModel;
@@ -123,7 +121,6 @@ class Cron
      * @param ProductFactory $productFactory
      * @param ProductRepository $productRepository
      * @param ProductAction $productAction
-     * @param TierPrice $tierPrice
      * @param StockRegistryInterface $stockRegistry
      * @param Category $categoryModel
      * @param CategoryFactory $categoryFactory
@@ -161,7 +158,6 @@ class Cron
         ProductFactory $productFactory,
         ProductRepository $productRepository,
         ProductAction $productAction,
-        TierPrice $tierPrice,
         StockRegistryInterface $stockRegistry,
         Category $categoryModel,
         CategoryFactory $categoryFactory,
@@ -199,7 +195,6 @@ class Cron
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
         $this->_productAction = $productAction;
-        $this->_tierPrice = $tierPrice;
         $this->_stockRegistry = $stockRegistry;
 
         $this->_categoryModel = $categoryModel;
@@ -564,36 +559,6 @@ class Cron
             $product = $this->setProductData($product, $data, $taxClassId, true);
         }
 
-        // Add product prices from Price Lists.
-        foreach ($data->ProductPriceLists as $priceList) {
-            if (isset($priceList->ProductPrices[0]->PriceValue)) {
-                $now = time();
-                $start = strtotime($priceList->ProductPrices[0]->EffectiveDateStart);
-                $end = strtotime($priceList->ProductPrices[0]->EffectiveDateEnd);
-
-                // Make sure a customer group exists with the same name as the price list.
-                $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
-
-                // Check if tier already exists. If not, add it.
-                $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : intval($priceList->ProductPrices[0]->Quantity);
-
-                if ($now < $end && $now > $start) {
-                    $this->_tierPrice->add(
-                        $data->Sku,
-                        $customerGroupId,
-                        $priceList->ProductPrices[0]->PriceValue,
-                        $quantity
-                    );
-                } else {
-                    $this->_tierPrice->remove(
-                        $data->Sku,
-                        $customerGroupId,
-                        $quantity
-                    );
-                }
-            }
-        }
-
         $websiteIds[] = $this->_currentWebsite->getId();
         $websiteIds = array_unique($websiteIds);
         $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
@@ -643,6 +608,32 @@ class Cron
     {
         $defaultAttributeSetId = $this->getDefaultProductAttributeSetId();
 
+        // Add product prices from Price Lists.
+        $prices = [];
+
+        foreach ($data->ProductPriceLists as $priceList) {
+            if (isset($priceList->ProductPrices[0]->PriceValue)) {
+                $now = time();
+                $start = strtotime($priceList->ProductPrices[0]->EffectiveDateStart);
+                $end = strtotime($priceList->ProductPrices[0]->EffectiveDateEnd);
+
+                // Make sure a customer group exists with the same name as the price list.
+                $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
+
+                // Set the quantity to at least 1.
+                $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : floatval($priceList->ProductPrices[0]->Quantity);
+
+                if ($now < $end && $now > $start) {
+                    $prices[] = [
+                        'website_id' => 0,
+                        'cust_group' => $customerGroupId,
+                        'price_qty' => $quantity,
+                        'price' => $priceList->ProductPrices[0]->PriceValue,
+                    ];
+                }
+            }
+        }
+
         $product
             ->setAttributeSetId($defaultAttributeSetId)
             ->setTypeId(Product\Type::TYPE_SIMPLE)
@@ -660,7 +651,8 @@ class Cron
             ->setPackSize($data->PackSize)
             ->setLength($data->Length)
             ->setWidth($data->Width)
-            ->setHeight($data->Height);
+            ->setHeight($data->Height)
+            ->setTierPrice($prices);
 
         if (empty($data->WebPrice)) {
             $product->setPrice($data->StandardPrice);
