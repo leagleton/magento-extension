@@ -36,6 +36,7 @@ use \Magento\Tax\Model\ResourceModel\TaxClass\CollectionFactory as TaxClassColle
 use \Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Eav\Model\Config as EavConfig;
+use \Magento\Framework\App\Config;
 use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
@@ -102,6 +103,7 @@ class Cron
     protected $_fileSystem;
     protected $_resourceConnection;
     protected $_eavConfig;
+    protected $_config;
     protected $_configInterface;
     protected $_filterBuilder;
     protected $_searchCriteriaBuilder;
@@ -146,6 +148,7 @@ class Cron
      * @param Filesystem $fileSystem
      * @param ResourceConnection $resourceConnection
      * @param EavConfig $eavConfig
+     * @param Config $config
      * @param ConfigInterface $configInterface
      * @param FilterBuilder $filterBuilder
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
@@ -183,6 +186,7 @@ class Cron
         Filesystem $fileSystem,
         ResourceConnection $resourceConnection,
         EavConfig $eavConfig,
+        Config $config,
         ConfigInterface $configInterface,
         FilterBuilder $filterBuilder,
         SearchCriteriaBuilder $searchCriteriaBuilder,
@@ -226,6 +230,7 @@ class Cron
         $this->_fileSystem = $fileSystem;
         $this->_resourceConnection = $resourceConnection;
         $this->_eavConfig = $eavConfig;
+        $this->_config = $config;
         $this->_configInterface = $configInterface;
         $this->_filterBuilder = $filterBuilder;
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
@@ -366,6 +371,8 @@ class Cron
         $this->_configInterface->saveConfig('winman_bridge/products/full_product_update', 0, $websiteScope, $websiteId);
         $this->_configInterface->saveConfig('winman_bridge/products/full_product_category_update', 0, $websiteScope, $websiteId);
         $this->_configInterface->saveConfig('winman_bridge/customers/full_customer_update', 0, $websiteScope, $websiteId);
+
+        $this->_config->clean();
     }
 
     /**
