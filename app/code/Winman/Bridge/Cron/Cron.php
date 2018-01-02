@@ -6,6 +6,7 @@ use \Winman\Bridge\Logger\Logger;
 use \Winman\Bridge\Helper\Data;
 use \Magento\Framework\App\ObjectManager;
 use \Magento\Catalog\Model\Product;
+use \Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
 use \Magento\Catalog\Model\Product\Action as ProductAction;
@@ -69,6 +70,7 @@ class Cron
     protected $_helper;
     protected $_objectManager;
     protected $_productModel;
+    protected $_productResource;
     protected $_productFactory;
     protected $_productRepository;
     protected $_productAction;
@@ -120,6 +122,7 @@ class Cron
      * @param Logger $logger
      * @param Data $helper
      * @param Product $productModel
+     * @param ProductResource $productResource
      * @param ProductFactory $productFactory
      * @param ProductRepository $productRepository
      * @param ProductAction $productAction
@@ -158,6 +161,7 @@ class Cron
         Logger $logger,
         Data $helper,
         Product $productModel,
+        ProductResource $productResource,
         ProductFactory $productFactory,
         ProductRepository $productRepository,
         ProductAction $productAction,
@@ -196,6 +200,7 @@ class Cron
         $this->_helper = $helper;
         $this->_objectManager = ObjectManager::getInstance();
         $this->_productModel = $productModel;
+        $this->_productResource = $productResource;
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
         $this->_productAction = $productAction;
@@ -971,7 +976,7 @@ class Cron
     {
         foreach ($products as $item) {
             $product = $this->_productRepository->get($item->ProductSku);
-            $categories = $product->getCategoryIds();
+            $categories = $this->_productResource->getCategoryIds($product);
 
             $categories[] = $categoryId;
 
@@ -979,7 +984,7 @@ class Cron
                 $this->_categoryLinkManagement
                     ->assignProductToCategories($item->ProductSku, $categories);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                $this->_logger->notice($e->getMessage());
             }
         }
     }
