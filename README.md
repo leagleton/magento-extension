@@ -1,6 +1,6 @@
 # WinMan Bridge for Magento 2
 
-**Current version: 1.0.0**
+**Current version: 1.0.1**
 
 The WinMan Bridge for Magento 2 makes integration between a WinMan application and a Magento installation possible. The Bridge can populate the following in Magento from WinMan:
 
@@ -18,17 +18,7 @@ The Bridge populates data in Magento at a website level (NOT store level), so ca
 
 ## Pre-requisites
 
-- Magento v2.1 or higher (tested and developed for v2.1.7).
-- At least one instance of the WinMan REST API v1.0.0.
+- Magento v2.2 or higher (tested and developed for v2.2.1).
+- At least one instance of the WinMan REST API v1.1.0.
 
-The WinMan REST API has its own set of pre-requisites. Please see the WinMan REST API knowledgebase for more information.
-
-## Limitations
-
-The following WinMan features are not currently supported by the WinMan Bridge, but are planned for future versions:
-
-- Price Lists.
-- Discounts.
-- Promotions.
-- Multiple Tax Codes for Customers.
-- Product Configurator.
+The WinMan REST API has its own set of pre-requisites. Please see the WinMan REST API user manual for more information.
