@@ -109,19 +109,25 @@ class Order implements ObserverInterface
 
         $orderItems = $order->getAllItems();
         $orderData = $order->getData();
+        $isGuest = $orderData['customer_is_guest'];
+        $guid = ($isGuest) ? null : $this->getCustomerGuid($orderData['customer_email']);
         $shipping = $this->getShippingAddress($order->getShippingAddress());
 
         $postData = array(
             'Data' => array(
                 'Website' => $this->_WINMAN_WEBSITE,
-                'CustomerGuid' => $this->getCustomerGuid($orderData['customer_email']),
                 'TotalOrderValue' => $orderData['grand_total'],
+                'TotalTaxValue' => $orderData['tax_amount'],
+                'Coupon' => $orderData['coupon_code'],
                 'CustomerOrderNumber' => $orderData['increment_id'],
-                'CustomerContact' => $orderData['customer_firstname'] . ' ' . $orderData['customer_lastname'],
                 'CurrencyCode' => $orderData['order_currency_code'],
                 'WebsiteUserName' => $orderData['customer_email']
             )
         );
+
+        if (!$isGuest) {
+            $postData['Data']['CustomerGuid'] = $guid;
+        }
 
         $items = [];
 
@@ -131,14 +137,16 @@ class Order implements ObserverInterface
             $items[] = array(
                 'Sku' => $itemData['sku'],
                 'Quantity' => $itemData['qty_ordered'],
-                'Price' => $itemData['price']
+                'OrderLineValue' => $itemData['row_total_incl_tax'],
+                'OrderLineTaxValue' => $itemData['tax_amount']
             );
         }
 
         $postData['Data']['SalesOrderItems'] = $items;
 
         $shipping['FreightMethodId'] = explode(' - ', $orderData['shipping_description'])[1];
-        $shipping['Price'] = $orderData['shipping_amount'];
+        $shipping['ShippingValue'] = $orderData['shipping_amount'] + $orderData['shipping_tax_amount'];
+        $shipping['ShippingTaxValue'] = $orderData['shipping_tax_amount'];
 
         $postData['Data']['SalesOrderShipping'] = $shipping;
 
@@ -157,6 +165,10 @@ class Order implements ObserverInterface
             $message = __('Order successfully placed in WinMan. WinMan order ID: ' . $response->Response->SalesOrderId);
             $order->setStatus('complete')->addStatusHistoryComment($message)->save();
             $order->setStatus('complete')->save();
+
+            if (!$isGuest) {
+                $this->updateCustomerGuid($orderData['customer_email'], $response->Response->CustomerGUID);
+            }
         } else {
             $message = __('Order could not be placed in WinMan. Please check logs for more information.');
             $order->setStatus('holded')->addStatusHistoryComment($message)->save();
@@ -189,8 +201,25 @@ class Order implements ObserverInterface
     private function getCustomerGuid($email)
     {
         $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
+        $guid = (empty($customer->getCustomAttribute('guid'))) ? null : $customer->getCustomAttribute('guid')->getValue();
 
-        return $customer->getCustomAttribute('guid')->getValue();
+        return $guid;
+    }
+
+    /**
+     * @param $email
+     * @param $guid
+     */
+    private function updateCustomerGuid($email, $guid)
+    {
+        $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
+        $customer->setCustomAttribute('guid', $guid);
+
+        try {
+            $this->_customerRepository->save($customer);
+        } catch (\Exception $e) {
+            $this->_logger->alert($e->getMessage());
+        }
     }
 
     /**
