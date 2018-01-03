@@ -28,6 +28,7 @@ use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
 use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Model\AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
+use \Magento\Directory\Model\ResourceModel\Country\Collection as CountryCollection;
 use \Magento\Store\Model\StoreRepository;
 use \Magento\Store\Model\StoreManager;
 use \Magento\Tax\Model\TaxClass\Factory as TaxClassFactory;
@@ -91,6 +92,7 @@ class Cron
     protected $_groupManagementInterface;
     protected $_addressFactory;
     protected $_addressRepository;
+    protected $_countryCollection;
 
     protected $_storeRepository;
     protected $_storeManager;
@@ -141,6 +143,7 @@ class Cron
      * @param GroupManagementInterface $groupManagementInterface
      * @param AddressFactory $addressFactory
      * @param AddressRepository $addressRepository
+     * @param CountryCollection $countryCollection
      * @param StoreRepository $storeRepository
      * @param StoreManager $storeManager
      * @param TaxClassFactory $taxClassFactory
@@ -180,6 +183,7 @@ class Cron
         GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
+        CountryCollection $countryCollection,
         StoreRepository $storeRepository,
         StoreManager $storeManager,
         TaxClassFactory $taxClassFactory,
@@ -221,6 +225,7 @@ class Cron
         $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
+        $this->_countryCollection = $countryCollection;
 
         $this->_storeRepository = $storeRepository;
         $this->_storeManager = $storeManager;
@@ -1055,12 +1060,19 @@ class Cron
      */
     private function updateCustomerAddresses($customer, $data, $contact)
     {
-        $city = ($data->City) ? $data->City : 'Not specified';
-        $region = ($data->Region) ? $data->Region : 'Not specified';
-        $telephone = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
+        $data->City = ($data->City) ? $data->City : 'Not specified';
+        $data->Region = ($data->Region) ? $data->Region : 'Not specified';
+        $contact->PhoneNumberWork = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
 
-        if (!$address = $this->findAddress($data, $contact)) {
-            // Add new address.
+        $data->Country = $this->_countryCollection
+            ->addFieldToFilter('iso3_code', $data->Country)
+            ->getFirstItem()
+            ->getData('iso2_code');
+
+        $address = $this->findAddress($data, $contact, $customer->getId());
+
+        if (!$address) {
+            // Address does not exist in Magento so add a new one.
             $address = $this->_addressFactory->create();
 
             $address->setCustomerId($customer->getId())
@@ -1068,10 +1080,10 @@ class Cron
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
                 ->setStreet($data->Address)
-                ->setCity($city)
-                ->setRegion($region)
+                ->setCity($data->City)
+                ->setRegion($data->Region)
                 ->setPostcode($data->PostalCode)
-                ->setTelephone($telephone)
+                ->setTelephone($contact->PhoneNumberWork)
                 ->setCountryId($data->Country)
                 ->setIsDefaultBilling(1)
                 ->setIsDefaultShipping(1)
@@ -1080,7 +1092,7 @@ class Cron
             try {
                 $address->save();
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                $this->_logger->alert($e->getMessage());
             }
         }
     }
@@ -1088,16 +1100,23 @@ class Cron
     /**
      * @param $data
      * @param $contact
+     * @param $customerId
      * @return bool|\Magento\Customer\Api\Data\AddressInterface
      */
-    private function findAddress($data, $contact)
+    private function findAddress($data, $contact, $customerId)
     {
         $searchCriteria = $this->_searchCriteriaBuilder
+            ->addFilter('parent_id', $customerId)
             ->addFilter('firstname', $contact->FirstName)
             ->addFilter('lastname', $contact->LastName)
             ->addFilter('street', $data->Address)
+            ->addFilter('city', $data->City)
+            ->addFilter('region', $data->Region)
             ->addFilter('postcode', $data->PostalCode)
+            ->addFilter('telephone', $contact->PhoneNumberWork)
+            ->addFilter('country_id', $data->Country)
             ->create();
+
         $addresses = $this->_addressRepository->getList($searchCriteria)->getItems();
 
         if (count($addresses) > 0) {
