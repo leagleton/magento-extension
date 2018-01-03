@@ -135,8 +135,6 @@ class Index extends Action
         curl_setopt($curl, CURLOPT_POST, true);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false); // TODO: get rid of this!
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false); // TODO: get rid of this!
         $response = curl_exec($curl);
 
         if (!$response) {

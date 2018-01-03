@@ -6,6 +6,7 @@ use \Winman\Bridge\Logger\Logger;
 use \Winman\Bridge\Helper\Data;
 use \Magento\Framework\App\ObjectManager;
 use \Magento\Catalog\Model\Product;
+use \Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
 use \Magento\Catalog\Model\Product\Action as ProductAction;
@@ -18,9 +19,13 @@ use \Magento\Catalog\Model\CategoryFactory;
 use \Magento\Catalog\Model\CategoryRepository;
 use \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
 use \Magento\Catalog\Api\CategoryLinkManagementInterface;
+use \Magento\Customer\Model\Customer as CustomerModel;
 use \Magento\Customer\Model\CustomerFactory as CustomerFactory;
 use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
-use \Magento\Customer\Model\ResourceModel\Group\Collection as CustomerGroupCollection;
+use \Magento\Customer\Model\ResourceModel\Group\CollectionFactory as CustomerGroupCollectionFactory;
+use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
+use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
+use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Model\AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
 use \Magento\Store\Model\StoreRepository;
@@ -32,6 +37,7 @@ use \Magento\Tax\Model\ResourceModel\TaxClass\CollectionFactory as TaxClassColle
 use \Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Eav\Model\Config as EavConfig;
+use \Magento\Framework\App\Config;
 use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
@@ -64,6 +70,7 @@ class Cron
     protected $_helper;
     protected $_objectManager;
     protected $_productModel;
+    protected $_productResource;
     protected $_productFactory;
     protected $_productRepository;
     protected $_productAction;
@@ -75,9 +82,13 @@ class Cron
     protected $_categoryCollectionFactory;
     protected $_categoryLinkManagement;
 
+    protected $_customerModel;
     protected $_customerFactory;
     protected $_customerRepository;
-    protected $_customerGroupCollection;
+    protected $_customerGroupCollectionFactory;
+    protected $_customerGroupRepository;
+    protected $_customerGroupFactory;
+    protected $_groupManagementInterface;
     protected $_addressFactory;
     protected $_addressRepository;
 
@@ -94,6 +105,7 @@ class Cron
     protected $_fileSystem;
     protected $_resourceConnection;
     protected $_eavConfig;
+    protected $_config;
     protected $_configInterface;
     protected $_filterBuilder;
     protected $_searchCriteriaBuilder;
@@ -110,6 +122,7 @@ class Cron
      * @param Logger $logger
      * @param Data $helper
      * @param Product $productModel
+     * @param ProductResource $productResource
      * @param ProductFactory $productFactory
      * @param ProductRepository $productRepository
      * @param ProductAction $productAction
@@ -119,9 +132,13 @@ class Cron
      * @param CategoryRepository $categoryRepository
      * @param CollectionFactory $categoryCollectionFactory
      * @param CategoryLinkManagementInterface $categoryLinkManagement
+     * @param CustomerModel $customerModel
      * @param CustomerFactory $customerFactory
      * @param CustomerRepository $customerRepository
-     * @param CustomerGroupCollection $customerGroupCollection
+     * @param CustomerGroupCollectionFactory $customerGroupCollectionFactory
+     * @param CustomerGroupRepository $customerGroupRepository
+     * @param CustomerGroupFactory $customerGroupFactory
+     * @param GroupManagementInterface $groupManagementInterface
      * @param AddressFactory $addressFactory
      * @param AddressRepository $addressRepository
      * @param StoreRepository $storeRepository
@@ -134,6 +151,7 @@ class Cron
      * @param Filesystem $fileSystem
      * @param ResourceConnection $resourceConnection
      * @param EavConfig $eavConfig
+     * @param Config $config
      * @param ConfigInterface $configInterface
      * @param FilterBuilder $filterBuilder
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
@@ -143,6 +161,7 @@ class Cron
         Logger $logger,
         Data $helper,
         Product $productModel,
+        ProductResource $productResource,
         ProductFactory $productFactory,
         ProductRepository $productRepository,
         ProductAction $productAction,
@@ -152,9 +171,13 @@ class Cron
         CategoryRepository $categoryRepository,
         CollectionFactory $categoryCollectionFactory,
         CategoryLinkManagementInterface $categoryLinkManagement,
+        CustomerModel $customerModel,
         CustomerFactory $customerFactory,
         CustomerRepository $customerRepository,
-        CustomerGroupCollection $customerGroupCollection,
+        CustomerGroupCollectionFactory $customerGroupCollectionFactory,
+        CustomerGroupRepository $customerGroupRepository,
+        CustomerGroupFactory $customerGroupFactory,
+        GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
         StoreRepository $storeRepository,
@@ -167,6 +190,7 @@ class Cron
         Filesystem $fileSystem,
         ResourceConnection $resourceConnection,
         EavConfig $eavConfig,
+        Config $config,
         ConfigInterface $configInterface,
         FilterBuilder $filterBuilder,
         SearchCriteriaBuilder $searchCriteriaBuilder,
@@ -176,6 +200,7 @@ class Cron
         $this->_helper = $helper;
         $this->_objectManager = ObjectManager::getInstance();
         $this->_productModel = $productModel;
+        $this->_productResource = $productResource;
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
         $this->_productAction = $productAction;
@@ -187,9 +212,13 @@ class Cron
         $this->_categoryCollectionFactory = $categoryCollectionFactory;
         $this->_categoryLinkManagement = $categoryLinkManagement;
 
+        $this->_customerModel = $customerModel;
         $this->_customerFactory = $customerFactory;
         $this->_customerRepository = $customerRepository;
-        $this->_customerGroupCollection = $customerGroupCollection;
+        $this->_customerGroupCollectionFactory = $customerGroupCollectionFactory;
+        $this->_customerGroupRepository = $customerGroupRepository;
+        $this->_customerGroupFactory = $customerGroupFactory;
+        $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
 
@@ -206,6 +235,7 @@ class Cron
         $this->_fileSystem = $fileSystem;
         $this->_resourceConnection = $resourceConnection;
         $this->_eavConfig = $eavConfig;
+        $this->_config = $config;
         $this->_configInterface = $configInterface;
         $this->_filterBuilder = $filterBuilder;
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
@@ -346,6 +376,8 @@ class Cron
         $this->_configInterface->saveConfig('winman_bridge/products/full_product_update', 0, $websiteScope, $websiteId);
         $this->_configInterface->saveConfig('winman_bridge/products/full_product_category_update', 0, $websiteScope, $websiteId);
         $this->_configInterface->saveConfig('winman_bridge/customers/full_customer_update', 0, $websiteScope, $websiteId);
+
+        $this->_config->clean();
     }
 
     /**
@@ -357,8 +389,6 @@ class Cron
         $curl = curl_init($apiUrl);
         curl_setopt($curl, CURLOPT_HTTPHEADER, $this->_CURL_HEADERS);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false); // TODO: get rid of this!
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false); // TODO: get rid of this!
         $response = curl_exec($curl);
 
         if (!$response) {
@@ -409,12 +439,6 @@ class Cron
             . urlencode($this->_WINMAN_WEBSITE)
             . '&sku=' . urlencode($sku);
 
-        $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
-
-        if (!$this->_FULL_PRODUCT_UPDATE) {
-            $apiUrl .= '&modified=' . $seconds;
-        }
-
         $response = $this->executeCurl($apiUrl);
 
         if (count($response->ProductAttachments) > 0) {
@@ -455,7 +479,7 @@ class Cron
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_PRODUCT_UPDATE) {
+        if (!$this->_FULL_CATEGORY_UPDATE) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
@@ -483,7 +507,7 @@ class Cron
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_PRODUCT_UPDATE) {
+        if (!$this->_FULL_CUSTOMER_UPDATE) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
@@ -496,6 +520,21 @@ class Cron
             $page += 1;
             $this->fetchCustomers($page);
         }
+    }
+
+    /**
+     * @param $guid
+     * @return mixed
+     */
+    private function fetchCustomerPriceList($guid)
+    {
+        $apiUrl = $this->_API_BASEURL . '/customerpricelists?website='
+            . urlencode($this->_WINMAN_WEBSITE)
+            . '&guid=' . $guid;
+
+        $response = $this->executeCurl($apiUrl);
+
+        return $response;
     }
 
     /**
@@ -534,6 +573,7 @@ class Cron
 
         $websiteIds[] = $this->_currentWebsite->getId();
         $websiteIds = array_unique($websiteIds);
+        $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
 
         if ($this->_ENABLE_IMAGES) {
             // Remove existing images.
@@ -545,7 +585,6 @@ class Cron
 
             try {
                 $product = $this->_productRepository->save($product);
-                $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
             } catch (\Exception $e) {
                 $this->_logger->critical($e->getMessage());
             }
@@ -563,7 +602,7 @@ class Cron
         }
 
         try {
-            // Remove the product from any unecessary websites.
+            // Remove the product from any unnecessary websites.
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
             $this->_logger->critical($e->getMessage());
@@ -580,6 +619,32 @@ class Cron
     private function setProductData($product, $data, $taxClassId, $isNew = false)
     {
         $defaultAttributeSetId = $this->getDefaultProductAttributeSetId();
+
+        // Add product prices from Price Lists.
+        $prices = [];
+
+        foreach ($data->ProductPriceLists as $priceList) {
+            if (isset($priceList->ProductPrices[0]->PriceValue)) {
+                $now = time();
+                $start = strtotime($priceList->ProductPrices[0]->EffectiveDateStart);
+                $end = strtotime($priceList->ProductPrices[0]->EffectiveDateEnd);
+
+                // Make sure a customer group exists with the same name as the price list.
+                $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
+
+                // Set the quantity to at least 1.
+                $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : floatval($priceList->ProductPrices[0]->Quantity);
+
+                if ($now < $end && $now > $start) {
+                    $prices[] = [
+                        'website_id' => 0,
+                        'cust_group' => $customerGroupId,
+                        'price_qty' => $quantity,
+                        'price' => $priceList->ProductPrices[0]->PriceValue,
+                    ];
+                }
+            }
+        }
 
         $product
             ->setAttributeSetId($defaultAttributeSetId)
@@ -598,7 +663,8 @@ class Cron
             ->setPackSize($data->PackSize)
             ->setLength($data->Length)
             ->setWidth($data->Width)
-            ->setHeight($data->Height);
+            ->setHeight($data->Height)
+            ->setTierPrice($prices);
 
         if (empty($data->WebPrice)) {
             $product->setPrice($data->StandardPrice);
@@ -630,7 +696,7 @@ class Cron
         if ($imageData->Type === 'WebImages') {
 
             if (!file_exists($this->_mediaPath . 'importedImages')) {
-                mkdir($this->_mediaPath . 'importedImages', 0777, true);
+                mkdir($this->_mediaPath . 'importedImages', 0775, true);
             }
 
             $imagePath = 'importedImages/' . $imageData->FileName;
@@ -639,16 +705,29 @@ class Cron
             fwrite($imageFile, base64_decode($imageData->Data));
             fclose($imageFile);
 
-            if (!empty($product->getThumbnail())) {
-                $product->addImageToMediaGallery($imagePath, null, false, false);
-            } else {
-                $product->addImageToMediaGallery($imagePath, array('image', 'small_image', 'thumbnail'), false, false);
-            }
+            $product->addImageToMediaGallery($imagePath, null, true, false);
 
             try {
                 $product->save();
             } catch (\Exception $e) {
                 $this->_logger->critical($e->getMessage());
+            }
+
+            if ($product->getThumbnail() == 'no_selection') {
+                $images = $product->getMediaGalleryImages();
+
+                foreach ($images as $image) {
+                    $product->setImage($image['file']);
+                    $product->setThumbnail($image['file']);
+                    $product->setSmallImage($image['file']);
+                    break;
+                }
+
+                try {
+                    $product->save();
+                } catch (\Exception $e) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
         }
     }
@@ -682,6 +761,49 @@ class Cron
     }
 
     /**
+     * @param null $groupName
+     * @return int|null
+     */
+    private function getCustomerGroupId($groupName = null)
+    {
+        // If group name is null, get the default customer group, else, check if group exists.
+        if (is_null($groupName)) {
+            $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
+            $groupId = $this->_groupManagementInterface
+                ->getDefaultGroup($defaultStoreId)
+                ->getId();
+
+            return $groupId;
+        }
+
+        $groupId = $this->_customerGroupCollectionFactory
+            ->create()
+            ->addFieldToFilter('customer_group_code', $groupName)
+            ->getFirstItem()
+            ->getId();
+
+        // If the customer group does not exist, create it.
+        if (!$groupId) {
+            $taxClasses = $this->_taxClassCollectionFactory->create()
+                ->addFieldToFilter('class_type', 'CUSTOMER')
+                ->addFieldToFilter('class_name', 'Retail Customer');
+
+            $taxClassId = $taxClasses->getFirstItem()->getId();
+            $taxClassId = ($taxClassId) ? $taxClassId : 0;
+
+            $group = $this->_customerGroupFactory->create();
+            $group->setCode($groupName)
+                ->setTaxClassId($taxClassId);
+
+            $group = $this->_customerGroupRepository->save($group);
+
+            $groupId = $group->getId();
+        }
+
+        return $groupId;
+    }
+
+    /**
      * @param $data
      */
     private function updateCategories($data)
@@ -689,6 +811,11 @@ class Cron
         // Save image to file
         $fileName = null;
         if (!empty($data->CategoryImage)) {
+
+            if (!file_exists($this->_mediaPath . 'catalog/category')) {
+                mkdir($this->_mediaPath . 'catalog/category', 0777, true);
+            }
+
             $imageData = base64_decode($data->CategoryImage);
             $f = finfo_open();
             $mime_type = finfo_buffer($f, $imageData, FILEINFO_MIME_TYPE);
@@ -776,7 +903,7 @@ class Cron
         } else if (isset($existingCategoryId)) {
             // Update existing category.
 
-            // TODO: check path is correct. If not, correct it?
+            // TODO: check path is correct. If not, correct it.
             $existingCategory = $this->_categoryRepository
                 ->get($existingCategoryId)
                 ->setUrlKey(urlencode($data->CategoryName))
@@ -801,8 +928,8 @@ class Cron
             $this->populateCategoryProducts($data->Products, $existingCategoryId);
         }
 
-        // TODO: remove products that are no longer in the category in WinMan??
-        // TODO: remove categories that no longer exist in WinMan??
+        // TODO: remove products that are no longer in the category in WinMan.
+        // TODO: remove categories that no longer exist in WinMan.
     }
 
     /**
@@ -849,7 +976,7 @@ class Cron
     {
         foreach ($products as $item) {
             $product = $this->_productRepository->get($item->ProductSku);
-            $categories = $product->getCategoryIds();
+            $categories = $this->_productResource->getCategoryIds($product);
 
             $categories[] = $categoryId;
 
@@ -857,7 +984,7 @@ class Cron
                 $this->_categoryLinkManagement
                     ->assignProductToCategories($item->ProductSku, $categories);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                $this->_logger->notice($e->getMessage());
             }
         }
     }
@@ -870,19 +997,25 @@ class Cron
         foreach ($data->Contacts as $contact) {
             $allowCommunication = ($contact->AllowCommunication) ? 1 : 0;
 
-            $groupId = $this->_customerGroupCollection
-                ->addFieldToFilter('customer_group_code', $data->TaxCode->TaxCodeId)
-                ->getFirstItem()
-                ->getId();
+            $priceList = $this->fetchCustomerPriceList($data->Guid);
+            if (isset($priceList->CustomerPriceLists[0]->PriceList->PriceListId)) {
+                $priceListId = $priceList->CustomerPriceLists[0]->PriceList->PriceListId;
+            } else {
+                $priceListId = null;
+            }
 
-            $groupId = ($groupId) ? $groupId : 1;
+            $groupId = $this->getCustomerGroupId($priceListId);
 
-            if ($customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId())) {
+            if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
+                $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
+
                 $customer
+                    ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
                     ->setData('allow_communication', $allowCommunication)
                     ->setDisableAutoGroupChange(1)
+                    ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId);
                 try {
                     $customer = $this->_customerRepository->save($customer);
@@ -895,15 +1028,16 @@ class Cron
                 $customer->setWebsiteId($this->_currentWebsite->getId())
                     ->setGuid($data->Guid)
                     ->setEmail($contact->WebsiteUserName)
+                    ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
                     ->setAllowCommunication($allowCommunication)
                     ->setDisableAutoGroupChange(1)
+                    ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId)
                     ->setPassword('abc123#ABC');
 
                 try {
-//                $this->_customerRepository->save($customer); // TODO: figure out a way to use repository to save!! This doesn't work :(.
                     $customer = $customer->save();
                 } catch (\Exception $e) {
                     $this->_logger->critical($e->getMessage());
@@ -930,6 +1064,7 @@ class Cron
             $address = $this->_addressFactory->create();
 
             $address->setCustomerId($customer->getId())
+                ->setPrefix($contact->Title)
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
                 ->setStreet($data->Address)
@@ -937,7 +1072,7 @@ class Cron
                 ->setRegion($region)
                 ->setPostcode($data->PostalCode)
                 ->setTelephone($telephone)
-                ->setCountryId(substr($data->Country, 0, -1))// TODO: look up iso2 properly.
+                ->setCountryId($data->Country)
                 ->setIsDefaultBilling(1)
                 ->setIsDefaultShipping(1)
                 ->setSaveInAddressBook(1);
