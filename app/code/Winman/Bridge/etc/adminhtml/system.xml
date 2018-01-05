@@ -114,7 +114,16 @@
                         If 'Yes' is selected above, customer information will be populated in Magento from WinMan.
                     </comment>
                 </field>
-                <field id="full_customer_update" translate="label comment" type="select" sortOrder="20"
+                <field id="email_customers" translate="label comment" type="select" sortOrder="20" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Send New Customers a Welcome Email?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, new customers created via the WinMan Data Bridge will be sent a
+                        welcome email when their account is created.
+                    </comment>
+                </field>
+                <field id="full_customer_update" translate="label comment" type="select" sortOrder="30"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Perform Full Customer Update?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

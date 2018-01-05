@@ -25,6 +25,7 @@ use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
 use \Magento\Customer\Model\ResourceModel\Group\CollectionFactory as CustomerGroupCollectionFactory;
 use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
+use \Magento\Framework\Mail\Template\TransportBuilder;
 use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Model\AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
@@ -42,7 +43,9 @@ use \Magento\Framework\App\Config;
 use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
+use \Magento\Framework\App\Area;
 use \Magento\Store\Model\ScopeInterface;
+use \Magento\Framework\App\Config\ScopeConfigInterface as ScopeConfig;
 use \Magento\Catalog\Model\Product\WebsiteFactory AS ProductWebsiteFactory;
 
 /**
@@ -62,6 +65,7 @@ class Cron
     private $_ENABLE_IMAGES;
     private $_ENABLE_CATEGORIES;
     private $_ENABLE_CUSTOMERS;
+    private $_EMAIL_CUSTOMERS;
 
     private $_FULL_PRODUCT_UPDATE;
     private $_FULL_CATEGORY_UPDATE;
@@ -89,6 +93,7 @@ class Cron
     protected $_customerGroupCollectionFactory;
     protected $_customerGroupRepository;
     protected $_customerGroupFactory;
+    protected $_transportBuilder;
     protected $_groupManagementInterface;
     protected $_addressFactory;
     protected $_addressRepository;
@@ -112,6 +117,7 @@ class Cron
     protected $_filterBuilder;
     protected $_searchCriteriaBuilder;
 
+    protected $_scopeConfig;
     protected $_productWebsiteFactory;
 
     private $_mediaPath;
@@ -140,6 +146,7 @@ class Cron
      * @param CustomerGroupCollectionFactory $customerGroupCollectionFactory
      * @param CustomerGroupRepository $customerGroupRepository
      * @param CustomerGroupFactory $customerGroupFactory
+     * @param TransportBuilder $transportBuilder
      * @param GroupManagementInterface $groupManagementInterface
      * @param AddressFactory $addressFactory
      * @param AddressRepository $addressRepository
@@ -158,6 +165,7 @@ class Cron
      * @param ConfigInterface $configInterface
      * @param FilterBuilder $filterBuilder
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param ScopeConfig $scopeConfig
      * @param ProductWebsiteFactory $productWebsiteFactory
      */
     public function __construct(
@@ -180,6 +188,7 @@ class Cron
         CustomerGroupCollectionFactory $customerGroupCollectionFactory,
         CustomerGroupRepository $customerGroupRepository,
         CustomerGroupFactory $customerGroupFactory,
+        TransportBuilder $transportBuilder,
         GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
@@ -198,6 +207,7 @@ class Cron
         ConfigInterface $configInterface,
         FilterBuilder $filterBuilder,
         SearchCriteriaBuilder $searchCriteriaBuilder,
+        ScopeConfig $scopeConfig,
         ProductWebsiteFactory $productWebsiteFactory)
     {
         $this->_logger = $logger;
@@ -222,6 +232,7 @@ class Cron
         $this->_customerGroupCollectionFactory = $customerGroupCollectionFactory;
         $this->_customerGroupRepository = $customerGroupRepository;
         $this->_customerGroupFactory = $customerGroupFactory;
+        $this->_transportBuilder = $transportBuilder;
         $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
@@ -245,6 +256,7 @@ class Cron
         $this->_filterBuilder = $filterBuilder;
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
 
+        $this->_scopeConfig = $scopeConfig;
         $this->_productWebsiteFactory = $productWebsiteFactory;
 
         $this->_mediaPath = $this->_fileSystem->getDirectoryRead(DirectoryList::MEDIA)->getAbsolutePath();
@@ -304,6 +316,7 @@ class Cron
         $this->_ENABLE_IMAGES = $this->_helper->getconfig('winman_bridge/products/enable_product_images', $websiteCode);
         $this->_ENABLE_CATEGORIES = $this->_helper->getconfig('winman_bridge/products/enable_product_categories', $websiteCode);
         $this->_ENABLE_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/enable_customers', $websiteCode);
+        $this->_EMAIL_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/email_customers', $websiteCode);
 
         $this->_FULL_PRODUCT_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_update', $websiteCode);
         $this->_FULL_CATEGORY_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_category_update', $websiteCode);
@@ -1011,45 +1024,89 @@ class Cron
 
             $groupId = $this->getCustomerGroupId($priceListId);
 
+            // Check if the customer already exists.
             if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
+                // If the customer exists, update their details.
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
 
                 $customer
+                    ->setCustomAttribute('guid', $data->Guid)
+                    ->setCustomAttribute('allow_communication', $allowCommunication)
                     ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
-                    ->setData('allow_communication', $allowCommunication)
                     ->setDisableAutoGroupChange(1)
                     ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId);
                 try {
                     $customer = $this->_customerRepository->save($customer);
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    $this->_logger->alert($e->getMessage());
                 }
             } else {
+                // If the customer does not exist, create a new one.
                 $customer = $this->_customerFactory->create();
 
-                $customer->setWebsiteId($this->_currentWebsite->getId())
-                    ->setGuid($data->Guid)
+                $customer
+                    ->setWebsiteId($this->_currentWebsite->getId())
                     ->setEmail($contact->WebsiteUserName)
                     ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
-                    ->setAllowCommunication($allowCommunication)
                     ->setDisableAutoGroupChange(1)
                     ->setTaxvat($data->TaxNumber)
-                    ->setGroupId($groupId)
-                    ->setPassword('abc123#ABC');
+                    ->setGroupId($groupId);
 
                 try {
-                    $customer = $customer->save();
+                    $newCustomer = $customer->save();
+
+                    // A bug in Magento prevents saving custom attribute data on
+                    // account creation (https://github.com/magento/magento2/issues/12479).
+                    // To get around bug, re-load the newly created customer and re-save.
+                    $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
+                    $customer->setCustomAttribute('guid', $data->Guid)
+                        ->setCustomAttribute('allow_communication', $allowCommunication);
+
+                    $customer = $this->_customerRepository->save($customer);
+
+                    if ($this->_EMAIL_CUSTOMERS) {
+                        $this->sendWelcomeEmail($newCustomer);
+                    }
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    $this->_logger->alert($e->getMessage());
                 }
             }
 
             $this->updateCustomerAddresses($customer, $data, $contact);
+        }
+    }
+
+    /**
+     * @param $customer
+     */
+    private function sendWelcomeEmail($customer)
+    {
+        $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
+        $defaultStore = $this->_storeManager->getStore($defaultStoreId);
+
+        $template = 'customer/create_account/email_no_password_template';
+        $sender = 'customer/create_account/email_identity';
+        $templateParams = ['customer' => $customer, 'back_url' => '', 'store' => $defaultStore];
+
+        $templateId = $this->_scopeConfig->getValue($template, ScopeInterface::SCOPE_STORE, $defaultStoreId);
+
+        $transport = $this->_transportBuilder
+            ->setTemplateIdentifier($templateId)
+            ->setTemplateOptions(['area' => Area::AREA_FRONTEND, 'store' => $defaultStoreId])
+            ->setTemplateVars($templateParams)
+            ->setFrom($this->_scopeConfig->getValue($sender, ScopeInterface::SCOPE_STORE, $defaultStoreId))
+            ->addTo($customer->getEmail(), $customer->getName())
+            ->getTransport();
+
+        try {
+            $transport->sendMessage();
+        } catch (\Exception $e) {
+            $this->_logger->alert($e->getMessage());
         }
     }
 
