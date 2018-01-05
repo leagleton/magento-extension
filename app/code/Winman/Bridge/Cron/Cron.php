@@ -59,6 +59,7 @@ class Cron
     private $_WINMAN_WEBSITE;
     private $_CURL_HEADERS;
     private $_ENABLED;
+    private $_ENABLE_LOGGING;
 
     private $_ENABLE_PRODUCTS;
     private $_ENABLE_STOCK;
@@ -278,7 +279,9 @@ class Cron
                 $this->_currentWebsite = $website;
 
                 if ($this->_ENABLED) {
-                    $this->_logger->info(__('WinMan synchronisation started for website: ') . $website->getName() . '.');
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->info(__('WinMan synchronisation started for website: ') . $website->getName() . '.');
+                    }
 
                     if ($this->_ENABLE_PRODUCTS) {
                         $this->fetchProducts();
@@ -294,7 +297,9 @@ class Cron
 
                     $this->disableFullUpdates($website->getid());
 
-                    $this->_logger->info(__('WinMan synchronisation finished for website: ') . $website->getName() . '.');
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->info(__('WinMan synchronisation finished for website: ') . $website->getName() . '.');
+                    }
                 }
             }
         }
@@ -310,6 +315,7 @@ class Cron
         $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $websiteCode);
         $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $websiteCode);
         $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
+        $this->_ENABLE_LOGGING = $this->_helper->getconfig('winman_bridge/general/enable_logging', $websiteCode);
 
         $this->_ENABLE_PRODUCTS = $this->_helper->getconfig('winman_bridge/products/enable_products', $websiteCode);
         $this->_ENABLE_STOCK = $this->_helper->getconfig('winman_bridge/products/enable_stock', $websiteCode);
@@ -409,7 +415,7 @@ class Cron
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curl);
 
-        if (!$response) {
+        if ($this->_ENABLE_LOGGING && !$response) {
             $this->_logger->critical('Error: "' . curl_error($curl) . '" - Code: ' . curl_errno($curl));
         }
 
@@ -604,7 +610,9 @@ class Cron
             try {
                 $product = $this->_productRepository->save($product);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             // Add new / updated images.
@@ -623,7 +631,9 @@ class Cron
             // Remove the product from any unnecessary websites.
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
     }
 
@@ -699,7 +709,9 @@ class Cron
         try {
             $product = $this->_productRepository->save($product);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
 
         return $product;
@@ -728,7 +740,9 @@ class Cron
             try {
                 $product->save();
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             if ($product->getThumbnail() == 'no_selection') {
@@ -744,7 +758,9 @@ class Cron
                 try {
                     $product->save();
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->critical($e->getMessage());
+                    }
                 }
             }
         }
@@ -774,7 +790,9 @@ class Cron
         try {
             $this->_stockRegistry->updateStockItemBySku($sku, $stockItem);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
     }
 
@@ -888,7 +906,9 @@ class Cron
                     try {
                         $newCategory = $this->_categoryRepository->save($newCategory);
                     } catch (\Exception $e) {
-                        $this->_logger->critical($e->getMessage());
+                        if ($this->_ENABLE_LOGGING) {
+                            $this->_logger->critical($e->getMessage());
+                        }
                     }
 
                     $parentId = $newCategory->getId();
@@ -914,7 +934,9 @@ class Cron
             try {
                 $new = $this->_categoryRepository->save($new);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             $existingCategoryId = $new->getId();
@@ -937,7 +959,9 @@ class Cron
             try {
                 $this->_categoryRepository->save($existingCategory);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
         }
 
@@ -1002,7 +1026,9 @@ class Cron
                 $this->_categoryLinkManagement
                     ->assignProductToCategories($item->ProductSku, $categories);
             } catch (\Exception $e) {
-                $this->_logger->notice($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->notice($e->getMessage());
+                }
             }
         }
     }
@@ -1041,7 +1067,9 @@ class Cron
                 try {
                     $customer = $this->_customerRepository->save($customer);
                 } catch (\Exception $e) {
-                    $this->_logger->alert($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->alert($e->getMessage());
+                    }
                 }
             } else {
                 // If the customer does not exist, create a new one.
@@ -1073,7 +1101,9 @@ class Cron
                         $this->sendWelcomeEmail($newCustomer);
                     }
                 } catch (\Exception $e) {
-                    $this->_logger->alert($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->alert($e->getMessage());
+                    }
                 }
             }
 
@@ -1106,7 +1136,9 @@ class Cron
         try {
             $transport->sendMessage();
         } catch (\Exception $e) {
-            $this->_logger->alert($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->alert($e->getMessage());
+            }
         }
     }
 
@@ -1149,7 +1181,9 @@ class Cron
             try {
                 $address->save();
             } catch (\Exception $e) {
-                $this->_logger->alert($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->alert($e->getMessage());
+                }
             }
         }
     }

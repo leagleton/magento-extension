@@ -7,7 +7,7 @@
         </tab>
         <section id="winman_bridge" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
                  showInStore="0">
-            <label>WinMan Data Bridge</label>
+            <label>WinMan Bridge</label>
             <tab>winman</tab>
             <resource>Winman_Bridge::winman_bridge</resource>
             <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
@@ -15,7 +15,7 @@
                 <label>General</label>
                 <field id="enable" translate="label comment" type="select" sortOrder="10" showInDefault="1"
                        showInWebsite="1" showInStore="0">
-                    <label>Enable Data Bridge?</label>
+                    <label>Enable Bridge?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>
                         If 'No' is selected above, no information will be passed between WinMan and Magento.
@@ -28,18 +28,28 @@
                         The base URL of your WinMan REST API.
                     </comment>
                 </field>
-                <field id="winman_website" translate="label comment" type="text" sortOrder="20" showInDefault="1"
+                <field id="winman_website" translate="label comment" type="text" sortOrder="30" showInDefault="1"
                        showInWebsite="1" showInStore="0">
                     <label>Website URL</label>
                     <comment>
                         The URL of your Magento website as it appears in WinMan.
                     </comment>
                 </field>
-                <field id="access_token" translate="label comment" type="textarea" sortOrder="20" showInDefault="1"
+                <field id="access_token" translate="label comment" type="textarea" sortOrder="40" showInDefault="1"
                        showInWebsite="1" showInStore="0">
                     <label>API Access Token</label>
                     <comment>
                         A valid access token for your WinMan REST API.
+                    </comment>
+                </field>
+                <field id="enable_logging" translate="label comment" type="select" sortOrder="50" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Enable Bridge Logging?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>
+                        If 'Yes' is selected above, log output from the WinMan Bridge will be saved to the WinMan
+                        Bridge log file. This is useful for debugging purposes but is not recommended for
+                        production environments.
                     </comment>
                 </field>
             </group>
@@ -119,7 +129,7 @@
                     <label>Send New Customers a Welcome Email?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>
-                        If 'Yes' is selected above, new customers created via the WinMan Data Bridge will be sent a
+                        If 'Yes' is selected above, new customers created via the WinMan Bridge will be sent a
                         welcome email when their account is created.
                     </comment>
                 </field>

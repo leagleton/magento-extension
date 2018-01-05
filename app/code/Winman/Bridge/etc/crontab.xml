@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
-    <group id="winman_bridge_cron_group">
+    <group id="winman">
         <job name="winman_bridge" instance="Winman\Bridge\Cron\Cron" method="execute">
             <schedule>*/15 * * * *</schedule>
         </job>
