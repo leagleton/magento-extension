@@ -108,18 +108,11 @@ class Index extends Action
         $response = $this->executeCurl($apiUrl, $dataString);
 
         if ($response->Response->Status === 'Error' || $response = '') {
-            switch ($response->Response->StatusMessage) {
-                case 'ERROR: Specified User Name already exists. Please check your input data.':
-                    $message = __('Account already exists with this email address.');
-                    break;
-                default:
-                    $message = __('There was a problem making your request.');
-            }
-
+            $message = __('There was a problem making your request.');
             $this->_messageManager->addErrorMessage($message);
         } else {
             $message = __('Your request has been submitted.');
-            $this->messageManager->addSuccessMessage($message);
+            $this->_messageManager->addSuccessMessage($message);
         }
     }
 

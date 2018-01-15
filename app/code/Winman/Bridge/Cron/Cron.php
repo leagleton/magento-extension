@@ -25,9 +25,11 @@ use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
 use \Magento\Customer\Model\ResourceModel\Group\CollectionFactory as CustomerGroupCollectionFactory;
 use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
+use \Magento\Framework\Mail\Template\TransportBuilder;
 use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Model\AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
+use \Magento\Directory\Model\ResourceModel\Country\Collection as CountryCollection;
 use \Magento\Store\Model\StoreRepository;
 use \Magento\Store\Model\StoreManager;
 use \Magento\Tax\Model\TaxClass\Factory as TaxClassFactory;
@@ -41,7 +43,9 @@ use \Magento\Framework\App\Config;
 use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
+use \Magento\Framework\App\Area;
 use \Magento\Store\Model\ScopeInterface;
+use \Magento\Framework\App\Config\ScopeConfigInterface as ScopeConfig;
 use \Magento\Catalog\Model\Product\WebsiteFactory AS ProductWebsiteFactory;
 
 /**
@@ -55,12 +59,14 @@ class Cron
     private $_WINMAN_WEBSITE;
     private $_CURL_HEADERS;
     private $_ENABLED;
+    private $_ENABLE_LOGGING;
 
     private $_ENABLE_PRODUCTS;
     private $_ENABLE_STOCK;
     private $_ENABLE_IMAGES;
     private $_ENABLE_CATEGORIES;
     private $_ENABLE_CUSTOMERS;
+    private $_EMAIL_CUSTOMERS;
 
     private $_FULL_PRODUCT_UPDATE;
     private $_FULL_CATEGORY_UPDATE;
@@ -88,9 +94,11 @@ class Cron
     protected $_customerGroupCollectionFactory;
     protected $_customerGroupRepository;
     protected $_customerGroupFactory;
+    protected $_transportBuilder;
     protected $_groupManagementInterface;
     protected $_addressFactory;
     protected $_addressRepository;
+    protected $_countryCollection;
 
     protected $_storeRepository;
     protected $_storeManager;
@@ -110,6 +118,7 @@ class Cron
     protected $_filterBuilder;
     protected $_searchCriteriaBuilder;
 
+    protected $_scopeConfig;
     protected $_productWebsiteFactory;
 
     private $_mediaPath;
@@ -138,9 +147,11 @@ class Cron
      * @param CustomerGroupCollectionFactory $customerGroupCollectionFactory
      * @param CustomerGroupRepository $customerGroupRepository
      * @param CustomerGroupFactory $customerGroupFactory
+     * @param TransportBuilder $transportBuilder
      * @param GroupManagementInterface $groupManagementInterface
      * @param AddressFactory $addressFactory
      * @param AddressRepository $addressRepository
+     * @param CountryCollection $countryCollection
      * @param StoreRepository $storeRepository
      * @param StoreManager $storeManager
      * @param TaxClassFactory $taxClassFactory
@@ -155,6 +166,7 @@ class Cron
      * @param ConfigInterface $configInterface
      * @param FilterBuilder $filterBuilder
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param ScopeConfig $scopeConfig
      * @param ProductWebsiteFactory $productWebsiteFactory
      */
     public function __construct(
@@ -177,9 +189,11 @@ class Cron
         CustomerGroupCollectionFactory $customerGroupCollectionFactory,
         CustomerGroupRepository $customerGroupRepository,
         CustomerGroupFactory $customerGroupFactory,
+        TransportBuilder $transportBuilder,
         GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
+        CountryCollection $countryCollection,
         StoreRepository $storeRepository,
         StoreManager $storeManager,
         TaxClassFactory $taxClassFactory,
@@ -194,6 +208,7 @@ class Cron
         ConfigInterface $configInterface,
         FilterBuilder $filterBuilder,
         SearchCriteriaBuilder $searchCriteriaBuilder,
+        ScopeConfig $scopeConfig,
         ProductWebsiteFactory $productWebsiteFactory)
     {
         $this->_logger = $logger;
@@ -218,9 +233,11 @@ class Cron
         $this->_customerGroupCollectionFactory = $customerGroupCollectionFactory;
         $this->_customerGroupRepository = $customerGroupRepository;
         $this->_customerGroupFactory = $customerGroupFactory;
+        $this->_transportBuilder = $transportBuilder;
         $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
+        $this->_countryCollection = $countryCollection;
 
         $this->_storeRepository = $storeRepository;
         $this->_storeManager = $storeManager;
@@ -240,6 +257,7 @@ class Cron
         $this->_filterBuilder = $filterBuilder;
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
 
+        $this->_scopeConfig = $scopeConfig;
         $this->_productWebsiteFactory = $productWebsiteFactory;
 
         $this->_mediaPath = $this->_fileSystem->getDirectoryRead(DirectoryList::MEDIA)->getAbsolutePath();
@@ -261,7 +279,9 @@ class Cron
                 $this->_currentWebsite = $website;
 
                 if ($this->_ENABLED) {
-                    $this->_logger->info(__('WinMan synchronisation started for website: ') . $website->getName() . '.');
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->info(__('WinMan synchronisation started for website: ') . $website->getName() . '.');
+                    }
 
                     if ($this->_ENABLE_PRODUCTS) {
                         $this->fetchProducts();
@@ -277,7 +297,9 @@ class Cron
 
                     $this->disableFullUpdates($website->getid());
 
-                    $this->_logger->info(__('WinMan synchronisation finished for website: ') . $website->getName() . '.');
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->info(__('WinMan synchronisation finished for website: ') . $website->getName() . '.');
+                    }
                 }
             }
         }
@@ -293,12 +315,14 @@ class Cron
         $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $websiteCode);
         $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $websiteCode);
         $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
+        $this->_ENABLE_LOGGING = $this->_helper->getconfig('winman_bridge/general/enable_logging', $websiteCode);
 
         $this->_ENABLE_PRODUCTS = $this->_helper->getconfig('winman_bridge/products/enable_products', $websiteCode);
         $this->_ENABLE_STOCK = $this->_helper->getconfig('winman_bridge/products/enable_stock', $websiteCode);
         $this->_ENABLE_IMAGES = $this->_helper->getconfig('winman_bridge/products/enable_product_images', $websiteCode);
         $this->_ENABLE_CATEGORIES = $this->_helper->getconfig('winman_bridge/products/enable_product_categories', $websiteCode);
         $this->_ENABLE_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/enable_customers', $websiteCode);
+        $this->_EMAIL_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/email_customers', $websiteCode);
 
         $this->_FULL_PRODUCT_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_update', $websiteCode);
         $this->_FULL_CATEGORY_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_category_update', $websiteCode);
@@ -391,7 +415,7 @@ class Cron
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curl);
 
-        if (!$response) {
+        if ($this->_ENABLE_LOGGING && !$response) {
             $this->_logger->critical('Error: "' . curl_error($curl) . '" - Code: ' . curl_errno($curl));
         }
 
@@ -586,7 +610,9 @@ class Cron
             try {
                 $product = $this->_productRepository->save($product);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             // Add new / updated images.
@@ -605,7 +631,9 @@ class Cron
             // Remove the product from any unnecessary websites.
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
     }
 
@@ -681,7 +709,9 @@ class Cron
         try {
             $product = $this->_productRepository->save($product);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
 
         return $product;
@@ -710,7 +740,9 @@ class Cron
             try {
                 $product->save();
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             if ($product->getThumbnail() == 'no_selection') {
@@ -726,7 +758,9 @@ class Cron
                 try {
                     $product->save();
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->critical($e->getMessage());
+                    }
                 }
             }
         }
@@ -756,7 +790,9 @@ class Cron
         try {
             $this->_stockRegistry->updateStockItemBySku($sku, $stockItem);
         } catch (\Exception $e) {
-            $this->_logger->critical($e->getMessage());
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->critical($e->getMessage());
+            }
         }
     }
 
@@ -870,7 +906,9 @@ class Cron
                     try {
                         $newCategory = $this->_categoryRepository->save($newCategory);
                     } catch (\Exception $e) {
-                        $this->_logger->critical($e->getMessage());
+                        if ($this->_ENABLE_LOGGING) {
+                            $this->_logger->critical($e->getMessage());
+                        }
                     }
 
                     $parentId = $newCategory->getId();
@@ -896,7 +934,9 @@ class Cron
             try {
                 $new = $this->_categoryRepository->save($new);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
 
             $existingCategoryId = $new->getId();
@@ -919,7 +959,9 @@ class Cron
             try {
                 $this->_categoryRepository->save($existingCategory);
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->critical($e->getMessage());
+                }
             }
         }
 
@@ -984,7 +1026,9 @@ class Cron
                 $this->_categoryLinkManagement
                     ->assignProductToCategories($item->ProductSku, $categories);
             } catch (\Exception $e) {
-                $this->_logger->notice($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->notice($e->getMessage());
+                }
             }
         }
     }
@@ -1006,45 +1050,95 @@ class Cron
 
             $groupId = $this->getCustomerGroupId($priceListId);
 
+            // Check if the customer already exists.
             if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
+                // If the customer exists, update their details.
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
 
                 $customer
+                    ->setCustomAttribute('guid', $data->Guid)
+                    ->setCustomAttribute('allow_communication', $allowCommunication)
                     ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
-                    ->setData('allow_communication', $allowCommunication)
                     ->setDisableAutoGroupChange(1)
                     ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId);
                 try {
                     $customer = $this->_customerRepository->save($customer);
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->alert($e->getMessage());
+                    }
                 }
             } else {
+                // If the customer does not exist, create a new one.
                 $customer = $this->_customerFactory->create();
 
-                $customer->setWebsiteId($this->_currentWebsite->getId())
-                    ->setGuid($data->Guid)
+                $customer
+                    ->setWebsiteId($this->_currentWebsite->getId())
                     ->setEmail($contact->WebsiteUserName)
                     ->setPrefix($contact->Title)
                     ->setFirstname($contact->FirstName)
                     ->setLastname($contact->LastName)
-                    ->setAllowCommunication($allowCommunication)
                     ->setDisableAutoGroupChange(1)
                     ->setTaxvat($data->TaxNumber)
-                    ->setGroupId($groupId)
-                    ->setPassword('abc123#ABC');
+                    ->setGroupId($groupId);
 
                 try {
-                    $customer = $customer->save();
+                    $newCustomer = $customer->save();
+
+                    // A bug in Magento prevents saving custom attribute data on
+                    // account creation (https://github.com/magento/magento2/issues/12479).
+                    // To get around bug, re-load the newly created customer and re-save.
+                    $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
+                    $customer->setCustomAttribute('guid', $data->Guid)
+                        ->setCustomAttribute('allow_communication', $allowCommunication);
+
+                    $customer = $this->_customerRepository->save($customer);
+
+                    if ($this->_EMAIL_CUSTOMERS) {
+                        $this->sendWelcomeEmail($newCustomer);
+                    }
                 } catch (\Exception $e) {
-                    $this->_logger->critical($e->getMessage());
+                    if ($this->_ENABLE_LOGGING) {
+                        $this->_logger->alert($e->getMessage());
+                    }
                 }
             }
 
             $this->updateCustomerAddresses($customer, $data, $contact);
+        }
+    }
+
+    /**
+     * @param $customer
+     */
+    private function sendWelcomeEmail($customer)
+    {
+        $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
+        $defaultStore = $this->_storeManager->getStore($defaultStoreId);
+
+        $template = 'customer/create_account/email_no_password_template';
+        $sender = 'customer/create_account/email_identity';
+        $templateParams = ['customer' => $customer, 'back_url' => '', 'store' => $defaultStore];
+
+        $templateId = $this->_scopeConfig->getValue($template, ScopeInterface::SCOPE_STORE, $defaultStoreId);
+
+        $transport = $this->_transportBuilder
+            ->setTemplateIdentifier($templateId)
+            ->setTemplateOptions(['area' => Area::AREA_FRONTEND, 'store' => $defaultStoreId])
+            ->setTemplateVars($templateParams)
+            ->setFrom($this->_scopeConfig->getValue($sender, ScopeInterface::SCOPE_STORE, $defaultStoreId))
+            ->addTo($customer->getEmail(), $customer->getName())
+            ->getTransport();
+
+        try {
+            $transport->sendMessage();
+        } catch (\Exception $e) {
+            if ($this->_ENABLE_LOGGING) {
+                $this->_logger->alert($e->getMessage());
+            }
         }
     }
 
@@ -1055,12 +1149,19 @@ class Cron
      */
     private function updateCustomerAddresses($customer, $data, $contact)
     {
-        $city = ($data->City) ? $data->City : 'Not specified';
-        $region = ($data->Region) ? $data->Region : 'Not specified';
-        $telephone = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
+        $data->City = ($data->City) ? $data->City : 'Not specified';
+        $data->Region = ($data->Region) ? $data->Region : 'Not specified';
+        $contact->PhoneNumberWork = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
 
-        if (!$address = $this->findAddress($data, $contact)) {
-            // Add new address.
+        $data->Country = $this->_countryCollection
+            ->addFieldToFilter('iso3_code', $data->Country)
+            ->getFirstItem()
+            ->getData('iso2_code');
+
+        $address = $this->findAddress($data, $contact, $customer->getId());
+
+        if (!$address) {
+            // Address does not exist in Magento so add a new one.
             $address = $this->_addressFactory->create();
 
             $address->setCustomerId($customer->getId())
@@ -1068,10 +1169,10 @@ class Cron
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
                 ->setStreet($data->Address)
-                ->setCity($city)
-                ->setRegion($region)
+                ->setCity($data->City)
+                ->setRegion($data->Region)
                 ->setPostcode($data->PostalCode)
-                ->setTelephone($telephone)
+                ->setTelephone($contact->PhoneNumberWork)
                 ->setCountryId($data->Country)
                 ->setIsDefaultBilling(1)
                 ->setIsDefaultShipping(1)
@@ -1080,7 +1181,9 @@ class Cron
             try {
                 $address->save();
             } catch (\Exception $e) {
-                $this->_logger->critical($e->getMessage());
+                if ($this->_ENABLE_LOGGING) {
+                    $this->_logger->alert($e->getMessage());
+                }
             }
         }
     }
@@ -1088,16 +1191,23 @@ class Cron
     /**
      * @param $data
      * @param $contact
+     * @param $customerId
      * @return bool|\Magento\Customer\Api\Data\AddressInterface
      */
-    private function findAddress($data, $contact)
+    private function findAddress($data, $contact, $customerId)
     {
         $searchCriteria = $this->_searchCriteriaBuilder
+            ->addFilter('parent_id', $customerId)
             ->addFilter('firstname', $contact->FirstName)
             ->addFilter('lastname', $contact->LastName)
             ->addFilter('street', $data->Address)
+            ->addFilter('city', $data->City)
+            ->addFilter('region', $data->Region)
             ->addFilter('postcode', $data->PostalCode)
+            ->addFilter('telephone', $contact->PhoneNumberWork)
+            ->addFilter('country_id', $data->Country)
             ->create();
+
         $addresses = $this->_addressRepository->getList($searchCriteria)->getItems();
 
         if (count($addresses) > 0) {

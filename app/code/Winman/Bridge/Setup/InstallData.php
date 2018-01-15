@@ -206,17 +206,14 @@ class InstallData implements InstallDataInterface
             'allow_communication',
             [
                 'type' => 'int',
-                'label' => 'Allow Communication?',
-                'input' => 'boolean',
-                'source'   => 'Magento\Eav\Model\Entity\Attribute\Source\Boolean',
-                'default' => true,
+                'label' => 'Communication Allowed',
+                'input' => 'select',
+                'source' => 'Magento\Eav\Model\Entity\Attribute\Source\Boolean',
                 'required' => false,
+                'default' => '0',
                 'system' => false,
                 'global' => ScopedAttributeInterface::SCOPE_GLOBAL,
-                'visible' => true,
-                'adminhtml_only' => false,
-                'user_defined' => true,
             ]
-        );        
+        );
     }
 }
