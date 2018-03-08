@@ -3,7 +3,6 @@
 namespace Winman\Bridge\Observer;
 
 use \Magento\Framework\Event\ObserverInterface;
-use \Magento\Framework\ObjectManagerInterface;
 use \Magento\Framework\Event\Observer;
 use \Winman\Bridge\Logger\Logger;
 use \Winman\Bridge\Helper\Data;
@@ -28,7 +27,6 @@ class Order implements ObserverInterface
 
     private $_currentWebsite;
 
-    protected $_objectManager;
     protected $_logger;
     protected $_helper;
     protected $_storeManager;
@@ -40,7 +38,6 @@ class Order implements ObserverInterface
 
     /**
      * Order constructor.
-     * @param ObjectManagerInterface $objectManager
      * @param Logger $logger
      * @param Data $helper
      * @param OrderRepository $orderRepository
@@ -50,7 +47,6 @@ class Order implements ObserverInterface
      * @param StoreManager $storeManager
      */
     public function __construct(
-        ObjectManagerInterface $objectManager,
         Logger $logger,
         Data $helper,
         OrderRepository $orderRepository,
@@ -59,7 +55,6 @@ class Order implements ObserverInterface
         CountryFactory $countryFactory,
         StoreManager $storeManager)
     {
-        $this->_objectManager = $objectManager;
         $this->_logger = $logger;
         $this->_helper = $helper;
         $this->_orderRepository = $orderRepository;
@@ -111,7 +106,8 @@ class Order implements ObserverInterface
         $orderData = $order->getData();
         $isGuest = $orderData['customer_is_guest'];
         $guid = ($isGuest) ? null : $this->getCustomerGuid($orderData['customer_email']);
-        $shipping = $this->getShippingAddress($order->getShippingAddress());
+        $shipping = $this->getAddress($order->getShippingAddress());
+        $billing = $this->getAddress($order->getBillingAddress(), 'billing');
 
         $postData = array(
             'Data' => array(
@@ -150,10 +146,8 @@ class Order implements ObserverInterface
 
         $postData['Data']['SalesOrderShipping'] = $shipping;
 
-        $billing = array(
-            'PaymentType' => $order->getPayment()->getMethodInstance()->getTitle(),
-            'CardPaymentReceived' => $orderData['total_paid']
-        );
+        $billing['PaymentType'] = $order->getPayment()->getMethodInstance()->getTitle();
+        $billing['CardPaymentReceived'] = $orderData['total_paid'];
 
         $postData['Data']['SalesOrderBilling'] = $billing;
 
@@ -180,18 +174,19 @@ class Order implements ObserverInterface
 
     /**
      * @param $address
+     * @param $type
      * @return array
      */
-    private function getShippingAddress($address)
+    private function getAddress($address, $type = 'shipping')
     {
-        $shippingAddress = array(
-            'ShippingName' => $address->getFirstname() . ' ' . $address->getLastName(),
-            'ShippingAddress' => $address->getStreet()[0],
-            'ShippingPostalCode' => $address->getPostcode(),
-            'ShippingCountryCode' => $this->getCountryCode($address->getCountryId())
+        $returnAddress = array(
+            ucfirst($type).'Name' => $address->getFirstname() . ' ' . $address->getLastName(),
+            ucfirst($type).'Address' => $address->getStreet()[0],
+            ucfirst($type).'PostalCode' => $address->getPostcode(),
+            ucfirst($type).'CountryCode' => $this->getCountryCode($address->getCountryId())
         );
 
-        return $shippingAddress;
+        return $returnAddress;
     }
 
     /**
