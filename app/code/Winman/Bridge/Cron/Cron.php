@@ -9,6 +9,8 @@ use \Magento\Catalog\Model\Product;
 use \Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
+use \Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory as OptionFactory;
+use \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterfaceFactory as OptionValuesFactory;
 use \Magento\Catalog\Model\Product\Action as ProductAction;
 use \Magento\Catalog\Api\Data\ProductAttributeInterface;
 use \Magento\CatalogInventory\Api\StockRegistryInterface;
@@ -27,7 +29,7 @@ use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
 use \Magento\Framework\Mail\Template\TransportBuilder;
 use \Magento\Customer\Api\GroupManagementInterface;
-use \Magento\Customer\Model\AddressFactory;
+use \Magento\Customer\Api\Data\AddressInterfaceFactory as AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
 use \Magento\Directory\Model\ResourceModel\Country\Collection as CountryCollection;
 use \Magento\Store\Model\StoreRepository;
@@ -79,6 +81,8 @@ class Cron
     protected $_productResource;
     protected $_productFactory;
     protected $_productRepository;
+    protected $_optionFactory;
+    protected $_optionValuesFactory;
     protected $_productAction;
     protected $_stockRegistry;
 
@@ -134,6 +138,8 @@ class Cron
      * @param ProductResource $productResource
      * @param ProductFactory $productFactory
      * @param ProductRepository $productRepository
+     * @param OptionFactory $optionFactory
+     * @param OptionValuesFactory $optionValuesFactory
      * @param ProductAction $productAction
      * @param StockRegistryInterface $stockRegistry
      * @param Category $categoryModel
@@ -176,6 +182,8 @@ class Cron
         ProductResource $productResource,
         ProductFactory $productFactory,
         ProductRepository $productRepository,
+        OptionFactory $optionFactory,
+        OptionValuesFactory $optionValuesFactory,
         ProductAction $productAction,
         StockRegistryInterface $stockRegistry,
         Category $categoryModel,
@@ -218,6 +226,8 @@ class Cron
         $this->_productResource = $productResource;
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
+        $this->_optionFactory = $optionFactory;
+        $this->_optionValuesFactory = $optionValuesFactory;
         $this->_productAction = $productAction;
         $this->_stockRegistry = $stockRegistry;
 
@@ -268,6 +278,10 @@ class Cron
 
     /**
      * @return $this
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
      */
     public function execute()
     {
@@ -352,6 +366,7 @@ class Cron
 
     /**
      * @return null|string
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     private function getDefaultProductAttributeSetId()
     {
@@ -427,6 +442,10 @@ class Cron
 
     /**
      * @param int $page
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
      */
     private function fetchProducts($page = 1)
     {
@@ -474,6 +493,7 @@ class Cron
 
     /**
      * @param $sku
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function fetchStockLevels($sku)
     {
@@ -492,6 +512,8 @@ class Cron
 
     /**
      * @param int $page
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function fetchCategories($page = 1)
     {
@@ -520,6 +542,8 @@ class Cron
 
     /**
      * @param int $page
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function fetchCustomers($page = 1)
     {
@@ -563,16 +587,20 @@ class Cron
 
     /**
      * @param $data
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
      */
     private function updateProductCatalog($data)
     {
-        $stores = $this->_storeRepository->getList();
-
-        // Using _productRepository->save() at global scope forces product to be saved to all websites.
-        // We don't necessarily want this, so we need to keep track of which website(s) the product belongs to.
+        /**
+         * Using _productRepository->save() at global scope forces product to be saved to all websites.
+         * We don't necessarily want this, so we need to keep track of which website(s) the product belongs to.
+         */
         $websiteIds = [];
 
-        // Find the correct tax class ID.
+        /** Find the correct tax class ID. */
         $taxClasses = $this->_taxClassCollectionFactory->create()
             ->addFieldToFilter('class_type', 'PRODUCT');
 
@@ -585,12 +613,12 @@ class Cron
         $taxClassId = ($data->Taxable) ? $taxClasses->getFirstItem()->getId() : 0;
         $taxClassId = ($taxClassId) ? $taxClassId : 0;
 
-        // If product already exists, update it.
+        /** If product already exists, update it. */
         if ($this->_productModel->getIdBySku($data->Sku)) {
             $product = $this->_productRepository->get($data->Sku);
             $websiteIds = $product->getWebsiteIds();
             $product = $this->setProductData($product, $data, $taxClassId, false);
-        } else { // Otherwise, create a new one.
+        } else { /** Otherwise, create a new one. */
             $product = $this->_productFactory->create();
             $product = $this->setProductData($product, $data, $taxClassId, true);
         }
@@ -600,7 +628,7 @@ class Cron
         $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
 
         if ($this->_ENABLE_IMAGES) {
-            // Remove existing images.
+            /** Remove existing images. */
             $mediaGalleryEntries = $product->getMediaGalleryEntries();
             foreach ($mediaGalleryEntries as $key => $entry) {
                 unset($mediaGalleryEntries[$key]);
@@ -615,7 +643,7 @@ class Cron
                 }
             }
 
-            // Add new / updated images.
+            /** Add new / updated images. */
             $attachments = $this->fetchProductImages($data->Sku);
             foreach ($attachments as $key => $attachment) {
                 $this->saveProductImage($product, $attachment);
@@ -623,12 +651,12 @@ class Cron
         }
 
         if ($this->_ENABLE_STOCK) {
-            // Set stock level.
+            /** Set stock level. */
             $this->fetchStockLevels($data->Sku);
         }
 
         try {
-            // Remove the product from any unnecessary websites.
+            /** Remove the product from any unnecessary websites. */
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
             if ($this->_ENABLE_LOGGING) {
@@ -643,12 +671,16 @@ class Cron
      * @param $taxClassId
      * @param bool $isNew
      * @return \Magento\Catalog\Api\Data\ProductInterface|mixed
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
      */
     private function setProductData($product, $data, $taxClassId, $isNew = false)
     {
         $defaultAttributeSetId = $this->getDefaultProductAttributeSetId();
 
-        // Add product prices from Price Lists.
+        /** Add product prices from Price Lists. */
         $prices = [];
 
         foreach ($data->ProductPriceLists as $priceList) {
@@ -657,10 +689,10 @@ class Cron
                 $start = strtotime($priceList->ProductPrices[0]->EffectiveDateStart);
                 $end = strtotime($priceList->ProductPrices[0]->EffectiveDateEnd);
 
-                // Make sure a customer group exists with the same name as the price list.
+                /** Make sure a customer group exists with the same name as the price list. */
                 $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
 
-                // Set the quantity to at least 1.
+                /** Set the quantity to at least 1. */
                 $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : floatval($priceList->ProductPrices[0]->Quantity);
 
                 if ($now < $end && $now > $start) {
@@ -679,7 +711,7 @@ class Cron
             ->setTypeId(Product\Type::TYPE_SIMPLE)
             ->setVisibility(Product\Visibility::VISIBILITY_BOTH)
             ->setStatus(Product\Attribute\Source\Status::STATUS_ENABLED)
-            ->setName($data->Name)
+            ->setName(ucwords(strtolower($data->Name)))
             ->setWeight($data->Weight)
             ->setDescription($data->LongDescription)
             ->setShortDescription($data->ShortDescription)
@@ -706,6 +738,11 @@ class Cron
             $product->setSku($data->Sku);
         }
 
+        if ($data->ConfigurableProduct) {
+            $product->setCanSaveCustomOptions(true);
+            $product->setOptions($this->createCustomOptionsArray($data->Sku, $data->ConfiguredStructureOptions));
+        }
+
         try {
             $product = $this->_productRepository->save($product);
         } catch (\Exception $e) {
@@ -715,6 +752,52 @@ class Cron
         }
 
         return $product;
+    }
+
+    /**
+     * @param $sku
+     * @param $options
+     * @return array
+     */
+    private function createCustomOptionsArray($sku, $options)
+    {
+        $productOptions = [];
+
+        foreach ($options as $key => $option) {
+            $productOptions[$key] = [
+                'title' => str_replace('&#34;', '"', ucwords(strtolower($option->OptionId))),
+                'type' => $option->AllowMultipleSelection ? 'multiple' : 'drop_down',
+                'is_require' => !$option->AllowNoSelection,
+                'sort_order' => $key + 1
+            ];
+
+            foreach ($option->OptionItems as $itemKey => $item) {
+                $productOptions[$key]['values'][] = [
+                    'title' => str_replace('&#34;', '"', ucwords(strtolower($item->OptionItemId))),
+                    'price' => $item->OptionItemPrice,
+                    'price_type' => 'fixed',
+                    'sku' => str_replace('&#34;', '"', strtoupper($item->OptionItemId)),
+                    'sort_order' => $itemKey + 1
+                ];
+            }
+        }
+
+        $customOptions = [];
+
+        foreach ($productOptions as $option) {
+            $customOption = $this->_optionFactory->create(['data' => $option]);
+            $customOption->setProductSku($sku);
+            if (isset($option['values'])) {
+                $values = [];
+                foreach ($option['values'] as $value) {
+                    $values[] = $this->_optionValuesFactory->create(['data' => $value]);
+                }
+                $customOption->setValues($values);
+            }
+            $customOptions[] = $customOption;
+        }
+
+        return $customOptions;
     }
 
     /**
@@ -768,6 +851,7 @@ class Cron
 
     /**
      * @param $inventory
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function updateStock($inventory)
     {
@@ -799,10 +883,14 @@ class Cron
     /**
      * @param null $groupName
      * @return int|null
+     * @throws \Magento\Framework\Exception\InputException
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
      */
     private function getCustomerGroupId($groupName = null)
     {
-        // If group name is null, get the default customer group, else, check if group exists.
+        /** If group name is null, get the default customer group, else, check if group exists. */
         if (is_null($groupName)) {
             $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
             $groupId = $this->_groupManagementInterface
@@ -818,7 +906,7 @@ class Cron
             ->getFirstItem()
             ->getId();
 
-        // If the customer group does not exist, create it.
+        /** If the customer group does not exist, create it. */
         if (!$groupId) {
             $taxClasses = $this->_taxClassCollectionFactory->create()
                 ->addFieldToFilter('class_type', 'CUSTOMER')
@@ -841,10 +929,12 @@ class Cron
 
     /**
      * @param $data
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function updateCategories($data)
     {
-        // Save image to file
+        /** Save image to file. */
         $fileName = null;
         if (!empty($data->CategoryImage)) {
 
@@ -878,9 +968,10 @@ class Cron
             $data->CategoryPath);
 
         if ($existingCategoryId === 0) {
-            // Create new category.
-            // Cycle through all categories in path, creating if necessary.
-
+            /**
+             * Create new category.
+             * Cycle through all categories in path, creating if necessary.
+             */
             $parents = explode('/', $data->CategoryPath);
             array_pop($parents);
             $parentId = $rootId;
@@ -896,7 +987,7 @@ class Cron
 
                 $parentCatId = $parentCategory->getId();
                 if (!isset($parentCatId)) {
-                    // Create the category.
+                    /** Create the category. */
                     $newCategory = $this->_categoryFactory->create();
                     $newCategory->setUrlKey(urlencode($parent))
                         ->setParentId($parentId)
@@ -941,9 +1032,8 @@ class Cron
 
             $existingCategoryId = $new->getId();
         } else if (isset($existingCategoryId)) {
-            // Update existing category.
+            /** Update existing category. */
 
-            // TODO: check path is correct. If not, correct it.
             $existingCategory = $this->_categoryRepository
                 ->get($existingCategoryId)
                 ->setUrlKey(urlencode($data->CategoryName))
@@ -965,13 +1055,10 @@ class Cron
             }
         }
 
-        // Add products to category.
+        /** Add products to category. */
         if (isset($existingCategoryId)) {
             $this->populateCategoryProducts($data->Products, $existingCategoryId);
         }
-
-        // TODO: remove products that are no longer in the category in WinMan.
-        // TODO: remove categories that no longer exist in WinMan.
     }
 
     /**
@@ -980,6 +1067,7 @@ class Cron
      * @param int|null $parentId
      * @param string|null $path
      * @return int
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     private function findExistingCategory(string $guid = null, string $name = null, int $parentId = null, string $path = null)
     {
@@ -989,7 +1077,7 @@ class Cron
             $category->addAttributeToFilter('guid', $guid);
         } else if (!is_null($name) && !is_null($path)) {
             $pathArray = explode('/', $path);
-            $level = count($pathArray) + 1; // TODO: should level be level of root category for default store + 1?
+            $level = count($pathArray) + 1;
             $category->addAttributeToFilter('name', $name)
                 ->addAttributeToFilter('level', $level);
         } else if (!is_null($name) && !is_null($parentId)) {
@@ -1007,12 +1095,13 @@ class Cron
         if ($result === 0 && !is_null($guid) && !is_null($name) && !is_null($path)) {
             $result = $this->findExistingCategory(null, $name, null, $path);
         }
-        return $result; // return category ID (int), or 0 if category does not exist.
+        return $result; /** return category ID (int), or 0 if category does not exist. */
     }
 
     /**
      * @param array $products
      * @param int $categoryId
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function populateCategoryProducts(array $products, int $categoryId)
     {
@@ -1035,6 +1124,8 @@ class Cron
 
     /**
      * @param $data
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function updateCustomers($data)
     {
@@ -1050,9 +1141,9 @@ class Cron
 
             $groupId = $this->getCustomerGroupId($priceListId);
 
-            // Check if the customer already exists.
+            /** Check if the customer already exists. */
             if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
-                // If the customer exists, update their details.
+                /** If the customer exists, update their details. */
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
 
                 $customer
@@ -1072,7 +1163,7 @@ class Cron
                     }
                 }
             } else {
-                // If the customer does not exist, create a new one.
+                /** If the customer does not exist, create a new one. */
                 $customer = $this->_customerFactory->create();
 
                 $customer
@@ -1088,9 +1179,11 @@ class Cron
                 try {
                     $newCustomer = $customer->save();
 
-                    // A bug in Magento prevents saving custom attribute data on
-                    // account creation (https://github.com/magento/magento2/issues/12479).
-                    // To get around bug, re-load the newly created customer and re-save.
+                    /**
+                     * A bug in Magento prevents saving custom attribute data on
+                     * account creation (https://github.com/magento/magento2/issues/12479).
+                     * To get around bug, re-load the newly created customer and re-save.
+                     */
                     $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
                     $customer->setCustomAttribute('guid', $data->Guid)
                         ->setCustomAttribute('allow_communication', $allowCommunication);
@@ -1146,11 +1239,11 @@ class Cron
      * @param $customer
      * @param $data
      * @param $contact
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     private function updateCustomerAddresses($customer, $data, $contact)
     {
         $data->City = ($data->City) ? $data->City : 'Not specified';
-        $data->Region = ($data->Region) ? $data->Region : 'Not specified';
         $contact->PhoneNumberWork = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
 
         $data->Country = $this->_countryCollection
@@ -1161,25 +1254,23 @@ class Cron
         $address = $this->findAddress($data, $contact, $customer->getId());
 
         if (!$address) {
-            // Address does not exist in Magento so add a new one.
+            /** Address does not exist in Magento so add a new one. */
             $address = $this->_addressFactory->create();
 
             $address->setCustomerId($customer->getId())
                 ->setPrefix($contact->Title)
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
-                ->setStreet($data->Address)
+                ->setStreet(explode('&#xD;&#xA;', $data->Address))
                 ->setCity($data->City)
-                ->setRegion($data->Region)
                 ->setPostcode($data->PostalCode)
                 ->setTelephone($contact->PhoneNumberWork)
                 ->setCountryId($data->Country)
                 ->setIsDefaultBilling(1)
-                ->setIsDefaultShipping(1)
-                ->setSaveInAddressBook(1);
+                ->setIsDefaultShipping(1);
 
             try {
-                $address->save();
+                $this->_addressRepository->save($address);
             } catch (\Exception $e) {
                 if ($this->_ENABLE_LOGGING) {
                     $this->_logger->alert($e->getMessage());
@@ -1193,16 +1284,19 @@ class Cron
      * @param $contact
      * @param $customerId
      * @return bool|\Magento\Customer\Api\Data\AddressInterface
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     private function findAddress($data, $contact, $customerId)
     {
+        $data->City = ($data->City) ? $data->City : 'Not specified';
+        $contact->PhoneNumberWork = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
+
         $searchCriteria = $this->_searchCriteriaBuilder
             ->addFilter('parent_id', $customerId)
             ->addFilter('firstname', $contact->FirstName)
             ->addFilter('lastname', $contact->LastName)
-            ->addFilter('street', $data->Address)
+            ->addFilter('street', str_replace('&#xD;&#xA;', "\n", $data->Address))
             ->addFilter('city', $data->City)
-            ->addFilter('region', $data->Region)
             ->addFilter('postcode', $data->PostalCode)
             ->addFilter('telephone', $contact->PhoneNumberWork)
             ->addFilter('country_id', $data->Country)

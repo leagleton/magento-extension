@@ -11,6 +11,7 @@ use \Magento\Sales\Model\OrderRepository;
 use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
 use \Magento\Directory\Model\CountryFactory;
+use \Magento\Framework\Notification\NotifierInterface as Notifier;
 
 /**
  * Class Order
@@ -36,6 +37,8 @@ class Order implements ObserverInterface
 
     protected $_orderRepository;
 
+    protected $_notifier;
+
     /**
      * Order constructor.
      * @param Logger $logger
@@ -45,6 +48,7 @@ class Order implements ObserverInterface
      * @param AddressRepository $addressRepository
      * @param CountryFactory $countryFactory
      * @param StoreManager $storeManager
+     * @param Notifier $notifier
      */
     public function __construct(
         Logger $logger,
@@ -53,7 +57,8 @@ class Order implements ObserverInterface
         CustomerRepository $customerRepository,
         AddressRepository $addressRepository,
         CountryFactory $countryFactory,
-        StoreManager $storeManager)
+        StoreManager $storeManager,
+        Notifier $notifier)
     {
         $this->_logger = $logger;
         $this->_helper = $helper;
@@ -64,13 +69,16 @@ class Order implements ObserverInterface
 
         $this->_storeManager = $storeManager;
 
-        $this->_currentWebsite = $this->_storeManager->getStore()->getWebsite();
+        $this->_notifier = $notifier;
 
-        $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $this->_currentWebsite->getCode());
-        $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $this->_currentWebsite->getCode());
-        $this->_WINMAN_WEBSITE = $this->_helper->getconfig('winman_bridge/general/winman_website', $this->_currentWebsite->getCode());
-        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $this->_currentWebsite->getCode());
-        $this->_ENABLE_ORDERS = $this->_helper->getconfig('winman_bridge/sales_orders/enable_salesorders', $this->_currentWebsite->getCode());
+        $this->_currentWebsite = $this->_storeManager->getStore()->getWebsite();
+        $websiteCode = $this->_currentWebsite->getCode();
+
+        $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $websiteCode);
+        $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $websiteCode);
+        $this->_WINMAN_WEBSITE = $this->_helper->getconfig('winman_bridge/general/winman_website', $websiteCode);
+        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
+        $this->_ENABLE_ORDERS = $this->_helper->getconfig('winman_bridge/sales_orders/enable_salesorders', $websiteCode);
 
         $headers = array();
         $headers[] = 'accept: application/json';
@@ -89,9 +97,12 @@ class Order implements ObserverInterface
             $order_ids = $observer->getEvent()->getOrderIds();
             $order_id = $order_ids[0];
 
-            $order = $this->_orderRepository->get($order_id);
-
-            $this->postRequest($order);
+            try {
+                $order = $this->_orderRepository->get($order_id);
+                $this->postRequest($order);
+            } catch (\Exception $e) {
+                $this->_logger->alert($e->getMessage());
+            }
         }
     }
 
@@ -127,15 +138,49 @@ class Order implements ObserverInterface
 
         $items = [];
 
-        foreach ($orderItems as $item) {
+        foreach ($orderItems as $key => $item) {
             $itemData = $item->getData();
 
-            $items[] = array(
-                'Sku' => $itemData['sku'],
+            $items[$key] = array(
+                'Sku' => $item->getProduct()->getSku(),
                 'Quantity' => $itemData['qty_ordered'],
                 'OrderLineValue' => $itemData['row_total_incl_tax'],
                 'OrderLineTaxValue' => $itemData['tax_amount']
             );
+
+            $options = isset($item->getProductOptions()['options']) ? $item->getProductOptions()['options'] : false;
+
+            if ($options) {
+                $items[$key]['UseConfigurator'] = true;
+                $items[$key]['ConfiguredSku'] = $itemData['sku'];
+                $items[$key]['Options'] = [];
+
+                foreach ($options as $option) {
+                    $optionValues = [];
+
+                    if (strpos($option['option_value'], ',')) {
+                        foreach (explode(',', $option['option_value']) as $v) {
+                            $optionValues[] = $v;
+                        }
+                    } else {
+                        $optionValues[] = $option['option_value'];
+                    }
+
+                    $optionData = $item->getProduct()->getOptionById($option['option_id'])->getValues();
+
+                    foreach ($optionData as $value) {
+                        if (in_array($value->getId(), $optionValues)) {
+                            $items[$key]['Options'][] = (object)array(
+                                'OptionId' => $option['label'],
+                                'OptionItemId' => $value->getTitle(),
+                                'OptionItemPrice' => ($value->getPrice()) ? $value->getPrice() : 0.00
+                            );
+                        }
+                    }
+
+                    unset($optionValues);
+                }
+            }
         }
 
         $postData['Data']['SalesOrderItems'] = $items;
@@ -155,8 +200,8 @@ class Order implements ObserverInterface
 
         $response = $this->executeCurl($apiUrl, $dataString);
 
-        if ($response->Response->Status === 'Success') {
-            $message = __('Order successfully placed in WinMan. WinMan order ID: ' . $response->Response->SalesOrderId);
+        if (isset($response->Response->Status) && $response->Response->Status === 'Success') {
+            $message = __('Order successfully placed in WinMan. WinMan order ID: ') . $response->Response->SalesOrderId;
             $order->setStatus('complete')->addStatusHistoryComment($message)->save();
             $order->setStatus('complete')->save();
 
@@ -164,11 +209,16 @@ class Order implements ObserverInterface
                 $this->updateCustomerGuid($orderData['customer_email'], $response->Response->CustomerGUID);
             }
         } else {
-            $message = __('Order could not be placed in WinMan. Please check logs for more information.');
+            $message = __('Order could not be placed in WinMan. The message from WinMan is: ') . $response->Response->StatusMessage;
             $order->setStatus('holded')->addStatusHistoryComment($message)->save();
             $order->setStatus('holded')->save();
 
-            $this->_logger->info($response->Response->StatusMessage);
+            $this->_notifier->addMajor(
+                'Order could not be placed in WinMan',
+                'Order ' . $orderData['increment_id'] .
+                ' could not be placed in WinMan. The message from WinMan is: '
+                . $response->Response->StatusMessage
+            );
         }
     }
 
@@ -180,10 +230,10 @@ class Order implements ObserverInterface
     private function getAddress($address, $type = 'shipping')
     {
         $returnAddress = array(
-            ucfirst($type).'Name' => $address->getFirstname() . ' ' . $address->getLastName(),
-            ucfirst($type).'Address' => $address->getStreet()[0],
-            ucfirst($type).'PostalCode' => $address->getPostcode(),
-            ucfirst($type).'CountryCode' => $this->getCountryCode($address->getCountryId())
+            ucfirst($type) . 'Name' => $address->getFirstname() . ' ' . $address->getLastName(),
+            ucfirst($type) . 'Address' => implode(chr(13) . chr(10), $address->getStreet()),
+            ucfirst($type) . 'PostalCode' => $address->getPostcode(),
+            ucfirst($type) . 'CountryCode' => $this->getCountryCode($address->getCountryId())
         );
 
         return $returnAddress;
@@ -195,7 +245,11 @@ class Order implements ObserverInterface
      */
     private function getCustomerGuid($email)
     {
-        $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
+        try {
+            $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
+        } catch (\Exception $e) {
+            $customer = null;
+        }
         $guid = (empty($customer->getCustomAttribute('guid'))) ? null : $customer->getCustomAttribute('guid')->getValue();
 
         return $guid;
@@ -207,10 +261,9 @@ class Order implements ObserverInterface
      */
     private function updateCustomerGuid($email, $guid)
     {
-        $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
-        $customer->setCustomAttribute('guid', $guid);
-
         try {
+            $customer = $this->_customerRepository->get($email, $this->_currentWebsite->getId());
+            $customer->setCustomAttribute('guid', $guid);
             $this->_customerRepository->save($customer);
         } catch (\Exception $e) {
             $this->_logger->alert($e->getMessage());
