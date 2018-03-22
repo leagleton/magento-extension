@@ -1,0 +1,32 @@
+.nav.items h3 {
+    font-size: 1.7rem;
+    margin-left: 1.8rem;
+}
+
+span.negative {
+    color: #CC0000;
+    font-weight: bold;
+}
+
+span.positive {
+    color: #008000;
+    font-weight: bold;
+}
+
+a.wmn-icon-link {
+    color: #333;
+    text-decoration: none;
+}
+
+span.wmn-icon,
+span.wmn-icon:hover {
+    font-family: 'luma-icons';
+    vertical-align: middle;
+}
+
+span.wmn-print::before {
+    content: '\e624';
+    font-family: 'luma-icons';
+    font-size: 1.6rem;
+    line-height: 1.6rem;
+}
