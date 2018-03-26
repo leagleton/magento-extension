@@ -30,3 +30,34 @@ span.wmn-print::before {
     font-size: 1.6rem;
     line-height: 1.6rem;
 }
+
+.block p.wmn-address span,
+.block div.wmn-box span {
+    display: block;
+}
+
+.wmn-print-order {
+    margin-top: 3.5rem;
+}
+
+.wmn-totals {
+    float: right;
+    text-align: right;
+    width: 48%;
+}
+
+.wmn-totals .wmn-box:nth-of-type(1) {
+    font-weight: bold;
+}
+
+.wmn-table th:last-of-type,
+.wmn-table th:nth-last-of-type(2),
+.wmn-table td:last-of-type,
+.wmn-table td:nth-last-of-type(2) {
+    text-align: right;
+}
+
+.wmn-view-all {
+    display: inline-block;
+    float: right;
+}

@@ -281,10 +281,12 @@ class Data extends Helper\AbstractHelper
      * @param string $apiUrl
      * @param array|null $data
      * @param bool $isPut
-     * @return mixed|bool
+     * @param bool $headersOnly
+     * @return mixed|array|bool
      */
-    public function executeCurl($websiteCode, $apiUrl, $data = null, $isPut = false)
+    public function executeCurl($websiteCode, $apiUrl, $data = null, $isPut = false, $headersOnly = false)
     {
+        $this->_winmanLogger->critical($apiUrl);
         $curl = curl_init($apiUrl);
         curl_setopt($curl, CURLOPT_HTTPHEADER, $this->getCurlHeaders($websiteCode));
 
@@ -302,6 +304,16 @@ class Data extends Helper\AbstractHelper
             }
         }
 
+        /**
+         * If we just want to retrieve the total count for a particular endpoint,
+         * we just need the x-total-count header, so tell cURL we want
+         * headers only.
+         */
+        if ($headersOnly) {
+            curl_setopt($curl, CURLOPT_HEADER, true);
+            curl_setopt($curl, CURLOPT_NOBODY, true);
+        }
+
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curl);
 
@@ -312,6 +324,23 @@ class Data extends Helper\AbstractHelper
         if (!$response) {
             $this->_winmanLogger->critical('Error: "' . curl_error($curl) . '" - Code: ' . curl_errno($curl));
             return false;
+        }
+
+        if ($headersOnly) {
+            $headers = explode("\r\n", $response);
+            $keys = [];
+            $values = [];
+
+            foreach ($headers as $h) {
+                if (strpos($h, ': ') > -1) {
+                    $header = explode(': ', $h);
+                    $keys[] = $header[0];
+                    $values[] = $header[1];
+                }
+            }
+
+            $headers = array_combine($keys, $values);
+            return $headers;
         }
 
         $decoded = json_decode($response);

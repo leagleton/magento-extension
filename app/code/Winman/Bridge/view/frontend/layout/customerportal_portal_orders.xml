@@ -14,7 +14,8 @@
         <referenceContainer name="content">
             <referenceContainer name="content">
                 <block class="Winman\Bridge\Block\Orders" name="orders"
-                       template="winman/orders.phtml"/>
+                       template="winman/orders.phtml"
+                       cacheable="false"/>
             </referenceContainer>
         </referenceContainer>
     </body>
