@@ -279,7 +279,7 @@ class Data extends Helper\AbstractHelper
      *
      * @param string $websiteCode
      * @param string $apiUrl
-     * @param array|null $data
+     * @param mixed|null $data
      * @param bool $isPut
      * @param bool $headersOnly
      * @return mixed|array|bool
@@ -297,7 +297,7 @@ class Data extends Helper\AbstractHelper
         if (!is_null($data)) {
             if ($isPut) {
                 curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
-                curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($data));
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
             } else {
                 curl_setopt($curl, CURLOPT_POST, true);
                 curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
