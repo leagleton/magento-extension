@@ -7,6 +7,7 @@ use \Magento\Framework\App\Action\Context;
 use \Winman\Bridge\Helper\Data;
 use \Magento\Store\Model\StoreManagerInterface as StoreManager;
 use \Magento\Customer\Model\SessionFactory;
+use \Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Overview
@@ -60,10 +61,24 @@ class Overview extends Action
     }
 
     /**
-     * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface|void
+     * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
      */
     public function execute()
     {
+        if (!$this->_customerSessionFactory->create()->isLoggedIn()) {
+            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect->setUrl('/customer/account/login');
+
+            return $resultRedirect;
+        }
+
+        if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
+            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect->setUrl('/customer/account');
+
+            return $resultRedirect;
+        }
+
         $pdfType = $this->getRequest()->getParam('pdf');
 
         $salesOrderId = $this->getRequest()->getParam('salesorderid');

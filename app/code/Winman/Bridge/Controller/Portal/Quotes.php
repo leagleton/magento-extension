@@ -74,6 +74,20 @@ class Quotes extends Action
      */
     public function execute()
     {
+        if (!$this->_customerSessionFactory->create()->isLoggedIn()) {
+            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect->setUrl('/customer/account/login');
+
+            return $resultRedirect;
+        }
+
+        if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
+            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect->setUrl('/customer/account');
+
+            return $resultRedirect;
+        }
+
         $action = $this->getRequest()->getParam('action');
         $reference = $this->getRequest()->getParam('reference');
         $id = $this->getRequest()->getParam('quoteid');
