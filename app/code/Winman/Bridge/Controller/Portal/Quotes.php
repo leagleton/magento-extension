@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Controller\Portal;
 
@@ -11,6 +14,7 @@ use \Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Quotes
+ *
  * @package Winman\Bridge\Controller\Portal
  */
 class Quotes extends Action
@@ -66,9 +70,12 @@ class Quotes extends Action
 
 
     /**
+     * If the customer is not logged in, redirect to the login page.
+     * If the customer does not have a WinMan Customer GUID, redirect to the
+     * regular Magento account dashboard.
+     * If the customer is logged in and has a WinMan Customer GUID, display the quotes page.
      * If the action, reference and quoteid parameters are specified, attempt to convert the
-     * specified quote to an order and redirect to the quotes page. Otherwise, display the
-     * quotes page.
+     * specified quote to an order and redirect to the quotes page.
      *
      * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
      */

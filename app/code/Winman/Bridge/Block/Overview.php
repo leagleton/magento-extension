@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Block;
 
@@ -58,6 +61,9 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the account overview and customer information from the WinMan REST API
+     * and compile it into one object for use in the template file.
+     *
      * @return mixed
      */
     public function getWinmanData()
@@ -74,6 +80,8 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the account overview information from the WinMan REST API.
+     *
      * @return string|mixed
      */
     private function getAccountOverview()
@@ -93,6 +101,8 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the customer information from the WinMan REST API.
+     *
      * @return string|mixed
      */
     private function getCustomer()
@@ -112,6 +122,8 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the customer's recent order information from the WinMan REST API.
+     *
      * @return string|mixed
      */
     public function getRecentOrders()
@@ -132,6 +144,8 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the customer's recent invoice information from the WinMan REST API.
+     *
      * @return string|mixed
      */
     public function getRecentInvoices()
@@ -170,6 +184,8 @@ class Overview extends Template
     }
 
     /**
+     * Fetch the relevant currency symbol based on the currency code.
+     *
      * @param string $currencyCode
      * @return string
      */

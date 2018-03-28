@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Controller\Portal;
 
@@ -61,6 +64,13 @@ class Overview extends Action
     }
 
     /**
+     * If the customer is not logged in, redirect to the login page.
+     * If the customer does not have a WinMan Customer GUID, redirect to the
+     * regular Magento account dashboard.
+     * If the customer is logged in and has a WinMan Customer GUID, display the overview page.
+     * If the pdf parameter is specified, the appropriate pdf will be returned instead of a page
+     * being rendered.
+     *
      * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
      */
     public function execute()
@@ -125,6 +135,8 @@ class Overview extends Action
     }
 
     /**
+     * Fetch the appropriate PDF file data from the WinMan REST API.
+     *
      * @param string $type
      * @param string $id
      * @return string|mixed

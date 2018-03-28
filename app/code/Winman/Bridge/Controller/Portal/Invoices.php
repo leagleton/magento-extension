@@ -39,6 +39,11 @@ class Invoices extends Action
     }
 
     /**
+     * If the customer is not logged in, redirect to the login page.
+     * If the customer does not have a WinMan Customer GUID, redirect to the
+     * regular Magento account dashboard.
+     * If the customer is logged in and has a WinMan Customer GUID, display the invoices page.
+     *
      * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
      */
     public function execute()
