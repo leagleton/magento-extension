@@ -5,17 +5,11 @@
         <css src="Winman_Bridge::css/style.css"/>
     </head>
     <body>
-        <!--<referenceBlock name="page.main.title">-->
-            <!--<action method="setPageTitle">-->
-                <!--<argument translate="true" name="title" xsi:type="string">Request New Customer Account</argument>-->
-            <!--</action>-->
-        <!--</referenceBlock>-->
         <referenceContainer name="content">
             <block class="Winman\Bridge\Block\RequestAccount" name="requestaccount"
                    template="winman/requestaccount.phtml"/>
         </referenceContainer>
         <referenceContainer name="page.messages">
-            <!--<block class="Magento\Framework\View\Element\Messages" name="messages" as="messages"/>-->
             <block class="Magento\Framework\View\Element\Template" name="ajax.message.placeholder" template="Magento_Theme::html/messages.phtml"/>
             <block class="Magento\Framework\View\Element\Messages" name="messages" as="messages" template="Magento_Theme::messages.phtml"/>
         </referenceContainer>

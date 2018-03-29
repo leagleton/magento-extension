@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Setup;
 
@@ -13,6 +16,7 @@ use \Magento\Customer\Model\Customer;
 
 /**
  * Class InstallData
+ *
  * @package Winman\Bridge\Setup
  */
 class InstallData implements InstallDataInterface
@@ -21,6 +25,7 @@ class InstallData implements InstallDataInterface
 
     /**
      * InstallData constructor.
+     *
      * @param EavSetupFactory $eavSetupFactory
      */
     public function __construct(EavSetupFactory $eavSetupFactory)

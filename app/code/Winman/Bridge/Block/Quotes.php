@@ -80,12 +80,16 @@ class Quotes extends Template
      */
     public function getQuotes($id = null, $orderBy = 'date')
     {
-        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/salesorders?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
-            . '&returntype=quotes&orderby=' . $orderBy
-            . '&page=' . $this->getPage() . '&size=' . $this->getPageSize();
+        try {
+            $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/salesorders?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
+                . '&returntype=quotes&orderby=' . $orderBy
+                . '&page=' . $this->getPage() . '&size=' . $this->getPageSize();
+        } catch (\Exception $e) {
+            return '';
+        }
 
         if (!is_null($id)) {
             $apiUrl .= '&quoteid=' . $id;
@@ -120,10 +124,16 @@ class Quotes extends Template
      */
     public function getCountryName($countryCode)
     {
-        return $this->_countryCollection
-            ->addFieldToFilter('iso3_code', $countryCode)
-            ->getFirstItem()
-            ->getName();
+        try {
+            $countryName = $this->_countryCollection
+                ->addFieldToFilter('iso3_code', $countryCode)
+                ->getFirstItem()
+                ->getName();
+        } catch (\Exception $e) {
+            $countryName = __('Unknown');
+        }
+
+        return $countryName;
     }
 
     /**
@@ -199,11 +209,15 @@ class Quotes extends Template
      */
     public function getTotalCount()
     {
-        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/salesorders?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
-            . '&returntype=quotes';
+        try {
+            $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/salesorders?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
+                . '&returntype=quotes';
+        } catch (\Exception $e) {
+            return 0;
+        }
 
         $response = $this->_helper->executeCurl($this->_websiteCode, $apiUrl, null, false, true);
 

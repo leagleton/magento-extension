@@ -1,6 +1,11 @@
 <?php
-if ($this->isBridgeEnabled()) {
-    ?>
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
+
+/** @var \Winman\Bridge\Block\RequestAccount $block */
+?>
+<?php if ($this->isBridgeEnabled()): ?>
     <div class="winman-request-account">
         <form class="form create account form-create-account"
               action="<?php echo $this->getFormAction(); ?>" method="post" id="form-validate" name="form-validate"
@@ -15,7 +20,6 @@ if ($this->isBridgeEnabled()) {
                     <label class="label" for="firstname">
                         <span><?php echo __('First Name'); ?></span>
                     </label>
-
                     <div class="control">
                         <input type="text" id="firstname" name="firstname" value="" title="First Name"
                                class="input-text" data-validate="{required:true}" autocomplete="off"
@@ -125,7 +129,6 @@ if ($this->isBridgeEnabled()) {
                            class="label"><span><?php echo __('Allow Communication'); ?></span></label>
                 </div>
             </fieldset>
-
             <div class="actions-toolbar">
                 <div class="primary">
                     <button type="submit" class="action submit primary" title="Create an Account">
@@ -134,9 +137,6 @@ if ($this->isBridgeEnabled()) {
             </div>
         </form>
     </div>
-    <?php
-} else {
-    echo __('This website is not currently accepting new account requests.');
-}
-?>
-
+<?php else: ?>
+    <?= __('This website is not currently accepting new account requests'); ?>
+<?php endif; ?>

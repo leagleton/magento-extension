@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Setup;
 
@@ -13,6 +16,7 @@ use \Magento\Framework\Exception\NoSuchEntityException;
 
 /**
  * Class UpgradeData
+ *
  * @package Winman\Bridge\Setup
  */
 class UpgradeData implements UpgradeDataInterface
@@ -22,6 +26,7 @@ class UpgradeData implements UpgradeDataInterface
 
     /**
      * UpgradeData constructor.
+     *
      * @param EavSetupFactory $eavSetupFactory
      * @param AttributeRepositoryInterface $attributeRepository
      */
@@ -37,10 +42,11 @@ class UpgradeData implements UpgradeDataInterface
      */
     public function upgrade(ModuleDataSetupInterface $setup, ModuleContextInterface $context)
     {
-        // Versions prior to 1.1.0 may not have created the
-        // allow_communication customer attribute correctly due to a bug.
-        // Check if it exists and create if it doesn't.
-
+        /**
+         * Versions prior to 1.1.0 may not have created the
+         * allow_communication customer attribute correctly due to a bug.
+         * Check if it exists and create if it doesn't.
+         */
         if (version_compare($context->getVersion(), '1.1.0', '<=')) {
             $eavSetup = $this->_eavSetupFactory->create(['setup' => $setup]);
 

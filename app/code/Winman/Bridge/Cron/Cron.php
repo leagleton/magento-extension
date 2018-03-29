@@ -1,212 +1,294 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Cron;
 
 use \Winman\Bridge\Logger\Logger;
 use \Winman\Bridge\Helper\Data;
-use \Magento\Framework\App\ObjectManager;
-use \Magento\Catalog\Model\Product;
-use \Magento\Catalog\Model\ResourceModel\Product as ProductResource;
 use \Magento\Catalog\Model\ProductFactory;
 use \Magento\Catalog\Model\ProductRepository;
 use \Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory as OptionFactory;
 use \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterfaceFactory as OptionValuesFactory;
-use \Magento\Catalog\Model\Product\Action as ProductAction;
-use \Magento\Catalog\Api\Data\ProductAttributeInterface;
 use \Magento\CatalogInventory\Api\StockRegistryInterface;
-use \Magento\Framework\App\Filesystem\DirectoryList;
 use \Magento\Framework\Filesystem;
-use \Magento\Catalog\Model\Category;
 use \Magento\Catalog\Model\CategoryFactory;
 use \Magento\Catalog\Model\CategoryRepository;
 use \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory;
 use \Magento\Catalog\Api\CategoryLinkManagementInterface;
-use \Magento\Customer\Model\Customer as CustomerModel;
-use \Magento\Customer\Model\CustomerFactory as CustomerFactory;
+use \Magento\Customer\Api\Data\CustomerInterfaceFactory as CustomerFactory;
 use \Magento\Customer\Api\CustomerRepositoryInterface as CustomerRepository;
 use \Magento\Customer\Model\ResourceModel\Group\CollectionFactory as CustomerGroupCollectionFactory;
-use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 use \Magento\Customer\Api\Data\GroupInterfaceFactory as CustomerGroupFactory;
+use \Magento\Customer\Api\GroupRepositoryInterface as CustomerGroupRepository;
 use \Magento\Framework\Mail\Template\TransportBuilder;
 use \Magento\Customer\Api\GroupManagementInterface;
 use \Magento\Customer\Api\Data\AddressInterfaceFactory as AddressFactory;
 use \Magento\Customer\Api\AddressRepositoryInterface as AddressRepository;
 use \Magento\Directory\Model\ResourceModel\Country\Collection as CountryCollection;
-use \Magento\Store\Model\StoreRepository;
 use \Magento\Store\Model\StoreManager;
-use \Magento\Tax\Model\TaxClass\Factory as TaxClassFactory;
-use \Magento\Tax\Model\TaxClass\Repository as TaxClassRepository;
-use \Magento\Tax\Model\ResourceModel\TaxClass\Collection as TaxClassCollection;
 use \Magento\Tax\Model\ResourceModel\TaxClass\CollectionFactory as TaxClassCollectionFactory;
 use \Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use \Magento\Framework\App\ResourceConnection;
 use \Magento\Eav\Model\Config as EavConfig;
 use \Magento\Framework\App\Config;
 use \Magento\Framework\App\Config\ConfigResource\ConfigInterface;
-use \Magento\Framework\Api\FilterBuilder;
 use \Magento\Framework\Api\SearchCriteriaBuilder;
-use \Magento\Framework\App\Area;
-use \Magento\Store\Model\ScopeInterface;
 use \Magento\Framework\App\Config\ScopeConfigInterface as ScopeConfig;
 use \Magento\Catalog\Model\Product\WebsiteFactory AS ProductWebsiteFactory;
 
 /**
  * Class Cron
+ *
  * @package Winman\Bridge\Cron
  */
 class Cron
 {
-    private $_ACCESS_TOKEN;
-    private $_API_BASEURL;
-    private $_WINMAN_WEBSITE;
-    private $_CURL_HEADERS;
-    private $_ENABLED;
-    private $_ENABLE_LOGGING;
-
-    private $_ENABLE_PRODUCTS;
-    private $_ENABLE_STOCK;
-    private $_ENABLE_IMAGES;
-    private $_ENABLE_CATEGORIES;
-    private $_ENABLE_CUSTOMERS;
-    private $_EMAIL_CUSTOMERS;
-
-    private $_FULL_PRODUCT_UPDATE;
-    private $_FULL_CATEGORY_UPDATE;
-    private $_FULL_CUSTOMER_UPDATE;
-
+    /**
+     * @var \Winman\Bridge\Logger\Logger
+     */
     protected $_logger;
+
+    /**
+     * @var \Winman\Bridge\Helper\Data
+     */
     protected $_helper;
-    protected $_objectManager;
-    protected $_productModel;
-    protected $_productResource;
+
+    /**
+     * @var \Magento\Catalog\Model\ProductFactory
+     */
     protected $_productFactory;
+
+    /**
+     * @var \Magento\Catalog\Model\ProductRepository
+     */
     protected $_productRepository;
+
+    /**
+     * @var \Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory
+     */
     protected $_optionFactory;
+
+    /**
+     * @var \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterfaceFactory
+     */
     protected $_optionValuesFactory;
-    protected $_productAction;
+
+    /**
+     * @var \Magento\CatalogInventory\Api\StockRegistryInterface
+     */
     protected $_stockRegistry;
 
-    protected $_categoryModel;
+    /**
+     * @var \Magento\Catalog\Model\CategoryFactory
+     */
     protected $_categoryFactory;
+
+    /**
+     * @var \Magento\Catalog\Model\CategoryRepository
+     */
     protected $_categoryRepository;
+
+    /**
+     * @var \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory
+     */
     protected $_categoryCollectionFactory;
+
+    /**
+     * @var \Magento\Catalog\Api\CategoryLinkManagementInterface
+     */
     protected $_categoryLinkManagement;
 
-    protected $_customerModel;
+    /**
+     * @var \Magento\Customer\Model\CustomerFactory
+     */
     protected $_customerFactory;
+
+    /**
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
+     */
     protected $_customerRepository;
+
+    /**
+     * @var \Magento\Customer\Model\ResourceModel\Group\CollectionFactory
+     */
     protected $_customerGroupCollectionFactory;
+
+    /**
+     * @var \Magento\Customer\Api\GroupRepositoryInterface
+     */
     protected $_customerGroupRepository;
+
+    /**
+     * @var \Magento\Customer\Api\Data\GroupInterfaceFactory
+     */
     protected $_customerGroupFactory;
+
+    /**
+     * @var \Magento\Framework\Mail\Template\TransportBuilder
+     */
     protected $_transportBuilder;
+
+    /**
+     * @var \Magento\Customer\Api\GroupManagementInterface
+     */
     protected $_groupManagementInterface;
+
+    /**
+     * @var \Magento\Customer\Api\Data\AddressInterfaceFactory
+     */
     protected $_addressFactory;
+
+    /**
+     * @var \Magento\Customer\Api\AddressRepositoryInterface
+     */
     protected $_addressRepository;
+
+    /**
+     * @var \Magento\Directory\Model\ResourceModel\Country\Collection
+     */
     protected $_countryCollection;
 
-    protected $_storeRepository;
+    /**
+     * @var \Magento\Store\Model\StoreManager
+     */
     protected $_storeManager;
 
-    protected $_taxClassFactory;
-    protected $_taxClassRepository;
-    protected $_taxClassCollection;
+    /**
+     * @var \Magento\Tax\Model\ResourceModel\TaxClass\CollectionFactory
+     */
     protected $_taxClassCollectionFactory;
 
+    /**
+     * @var \Magento\Framework\Stdlib\DateTime\TimezoneInterface
+     */
     protected $_timezoneInterface;
 
+    /**
+     * @var \Magento\Framework\Filesystem
+     */
     protected $_fileSystem;
+
+    /**
+     * @var \Magento\Framework\App\ResourceConnection
+     */
     protected $_resourceConnection;
+
+    /**
+     * @var \Magento\Eav\Model\Config
+     */
     protected $_eavConfig;
+
+    /**
+     * @var \Magento\Framework\App\Config
+     */
     protected $_config;
+
+    /**
+     * @var \Magento\Framework\App\Config\ConfigResource\ConfigInterface
+     */
     protected $_configInterface;
-    protected $_filterBuilder;
+
+    /**
+     * @var \Magento\Framework\Api\SearchCriteriaBuilder
+     */
     protected $_searchCriteriaBuilder;
 
+    /**
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
+     */
     protected $_scopeConfig;
+
+    /**
+     * @var \Magento\Catalog\Model\Product\WebsiteFactory
+     */
     protected $_productWebsiteFactory;
 
+    /**
+     * @var string
+     */
     private $_mediaPath;
+
+    /**
+     * @var integer
+     */
     private $_lastExecutedTimestamp;
+
+    /**
+     * @var array|\Magento\Store\Api\Data\WebsiteInterface[]
+     */
     private $_websites;
+
+    /**
+     * @var \Magento\Store\Api\Data\WebsiteInterface
+     */
     private $_currentWebsite;
 
     /**
+     * @var boolean
+     */
+    private $_finishWithErrors = false;
+
+    /**
      * Cron constructor.
-     * @param Logger $logger
-     * @param Data $helper
-     * @param Product $productModel
-     * @param ProductResource $productResource
-     * @param ProductFactory $productFactory
-     * @param ProductRepository $productRepository
-     * @param OptionFactory $optionFactory
-     * @param OptionValuesFactory $optionValuesFactory
-     * @param ProductAction $productAction
-     * @param StockRegistryInterface $stockRegistry
-     * @param Category $categoryModel
-     * @param CategoryFactory $categoryFactory
-     * @param CategoryRepository $categoryRepository
-     * @param CollectionFactory $categoryCollectionFactory
-     * @param CategoryLinkManagementInterface $categoryLinkManagement
-     * @param CustomerModel $customerModel
-     * @param CustomerFactory $customerFactory
-     * @param CustomerRepository $customerRepository
-     * @param CustomerGroupCollectionFactory $customerGroupCollectionFactory
-     * @param CustomerGroupRepository $customerGroupRepository
-     * @param CustomerGroupFactory $customerGroupFactory
-     * @param TransportBuilder $transportBuilder
-     * @param GroupManagementInterface $groupManagementInterface
-     * @param AddressFactory $addressFactory
-     * @param AddressRepository $addressRepository
-     * @param CountryCollection $countryCollection
-     * @param StoreRepository $storeRepository
-     * @param StoreManager $storeManager
-     * @param TaxClassFactory $taxClassFactory
-     * @param TaxClassRepository $taxClassRepository
-     * @param TaxClassCollection $taxClassCollection
-     * @param TaxClassCollectionFactory $taxClassCollectionFactory
-     * @param TimezoneInterface $timezoneInterface
-     * @param Filesystem $fileSystem
-     * @param ResourceConnection $resourceConnection
-     * @param EavConfig $eavConfig
-     * @param Config $config
-     * @param ConfigInterface $configInterface
-     * @param FilterBuilder $filterBuilder
-     * @param SearchCriteriaBuilder $searchCriteriaBuilder
-     * @param ScopeConfig $scopeConfig
-     * @param ProductWebsiteFactory $productWebsiteFactory
+     *
+     * @param \Winman\Bridge\Logger\Logger $logger
+     * @param \Winman\Bridge\Helper\Data $helper
+     * @param \Magento\Catalog\Model\ProductFactory $productFactory
+     * @param \Magento\Catalog\Model\ProductRepository $productRepository
+     * @param \Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory $optionFactory
+     * @param \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterfaceFactory $optionValuesFactory
+     * @param \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry
+     * @param \Magento\Catalog\Model\CategoryFactory $categoryFactory
+     * @param \Magento\Catalog\Model\CategoryRepository $categoryRepository
+     * @param \Magento\Catalog\Model\ResourceModel\Category\CollectionFactory $categoryCollectionFactory
+     * @param \Magento\Catalog\Api\CategoryLinkManagementInterface $categoryLinkManagement
+     * @param \Magento\Customer\Api\Data\CustomerInterfaceFactory $customerFactory
+     * @param \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository
+     * @param \Magento\Customer\Model\ResourceModel\Group\CollectionFactory $customerGroupCollectionFactory
+     * @param \Magento\Customer\Api\Data\GroupInterfaceFactory $customerGroupFactory
+     * @param \Magento\Customer\Api\GroupRepositoryInterface $customerGroupRepository
+     * @param \Magento\Framework\Mail\Template\TransportBuilder $transportBuilder
+     * @param \Magento\Customer\Api\GroupManagementInterface $groupManagementInterface
+     * @param \Magento\Customer\Api\Data\AddressInterfaceFactory $addressFactory
+     * @param \Magento\Customer\Api\AddressRepositoryInterface $addressRepository
+     * @param \Magento\Directory\Model\ResourceModel\Country\Collection $countryCollection
+     * @param \Magento\Store\Model\StoreManager $storeManager
+     * @param \Magento\Tax\Model\ResourceModel\TaxClass\CollectionFactory $taxClassCollectionFactory
+     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $timezoneInterface
+     * @param \Magento\Framework\Filesystem $fileSystem
+     * @param \Magento\Framework\App\ResourceConnection $resourceConnection
+     * @param \Magento\Eav\Model\Config $eavConfig
+     * @param \Magento\Framework\App\Config $config
+     * @param \Magento\Framework\App\Config\ConfigResource\ConfigInterface $configInterface
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
+     * @param \Magento\Catalog\Model\Product\WebsiteFactory $productWebsiteFactory
      */
     public function __construct(
         Logger $logger,
         Data $helper,
-        Product $productModel,
-        ProductResource $productResource,
         ProductFactory $productFactory,
         ProductRepository $productRepository,
         OptionFactory $optionFactory,
         OptionValuesFactory $optionValuesFactory,
-        ProductAction $productAction,
         StockRegistryInterface $stockRegistry,
-        Category $categoryModel,
         CategoryFactory $categoryFactory,
         CategoryRepository $categoryRepository,
         CollectionFactory $categoryCollectionFactory,
         CategoryLinkManagementInterface $categoryLinkManagement,
-        CustomerModel $customerModel,
         CustomerFactory $customerFactory,
         CustomerRepository $customerRepository,
         CustomerGroupCollectionFactory $customerGroupCollectionFactory,
-        CustomerGroupRepository $customerGroupRepository,
         CustomerGroupFactory $customerGroupFactory,
+        CustomerGroupRepository $customerGroupRepository,
         TransportBuilder $transportBuilder,
         GroupManagementInterface $groupManagementInterface,
         AddressFactory $addressFactory,
         AddressRepository $addressRepository,
         CountryCollection $countryCollection,
-        StoreRepository $storeRepository,
         StoreManager $storeManager,
-        TaxClassFactory $taxClassFactory,
-        TaxClassRepository $taxClassRepository,
-        TaxClassCollection $taxClassCollection,
         TaxClassCollectionFactory $taxClassCollectionFactory,
         TimezoneInterface $timezoneInterface,
         Filesystem $fileSystem,
@@ -214,74 +296,62 @@ class Cron
         EavConfig $eavConfig,
         Config $config,
         ConfigInterface $configInterface,
-        FilterBuilder $filterBuilder,
         SearchCriteriaBuilder $searchCriteriaBuilder,
         ScopeConfig $scopeConfig,
         ProductWebsiteFactory $productWebsiteFactory)
     {
         $this->_logger = $logger;
         $this->_helper = $helper;
-        $this->_objectManager = ObjectManager::getInstance();
-        $this->_productModel = $productModel;
-        $this->_productResource = $productResource;
+
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
         $this->_optionFactory = $optionFactory;
         $this->_optionValuesFactory = $optionValuesFactory;
-        $this->_productAction = $productAction;
+        $this->_productWebsiteFactory = $productWebsiteFactory;
         $this->_stockRegistry = $stockRegistry;
 
-        $this->_categoryModel = $categoryModel;
         $this->_categoryFactory = $categoryFactory;
         $this->_categoryRepository = $categoryRepository;
         $this->_categoryCollectionFactory = $categoryCollectionFactory;
         $this->_categoryLinkManagement = $categoryLinkManagement;
 
-        $this->_customerModel = $customerModel;
         $this->_customerFactory = $customerFactory;
         $this->_customerRepository = $customerRepository;
         $this->_customerGroupCollectionFactory = $customerGroupCollectionFactory;
-        $this->_customerGroupRepository = $customerGroupRepository;
         $this->_customerGroupFactory = $customerGroupFactory;
+        $this->_customerGroupRepository = $customerGroupRepository;
         $this->_transportBuilder = $transportBuilder;
         $this->_groupManagementInterface = $groupManagementInterface;
         $this->_addressFactory = $addressFactory;
         $this->_addressRepository = $addressRepository;
         $this->_countryCollection = $countryCollection;
-
-        $this->_storeRepository = $storeRepository;
-        $this->_storeManager = $storeManager;
-
-        $this->_taxClassFactory = $taxClassFactory;
-        $this->_taxClassRepository = $taxClassRepository;
-        $this->_taxClassCollection = $taxClassCollection;
         $this->_taxClassCollectionFactory = $taxClassCollectionFactory;
 
-        $this->_timezoneInterface = $timezoneInterface;
+        $this->_storeManager = $storeManager;
 
+        $this->_timezoneInterface = $timezoneInterface;
         $this->_fileSystem = $fileSystem;
         $this->_resourceConnection = $resourceConnection;
+
         $this->_eavConfig = $eavConfig;
         $this->_config = $config;
         $this->_configInterface = $configInterface;
-        $this->_filterBuilder = $filterBuilder;
+        $this->_scopeConfig = $scopeConfig;
+
         $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
 
-        $this->_scopeConfig = $scopeConfig;
-        $this->_productWebsiteFactory = $productWebsiteFactory;
-
-        $this->_mediaPath = $this->_fileSystem->getDirectoryRead(DirectoryList::MEDIA)->getAbsolutePath();
+        $this->_mediaPath = $this->_fileSystem->getDirectoryRead('media')->getAbsolutePath();
         $this->_lastExecutedTimestamp = $this->getLastExecutedTimestamp();
 
         $this->_websites = $this->_storeManager->getWebsites(false, true);
     }
 
     /**
+     * Execute the cron job. Throw an exception if any of the updates error so that the
+     * timestamp of the last successful run is accurate.
+     *
      * @return $this
-     * @throws \Magento\Framework\Exception\InputException
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
-     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
+     * @throws \Exception
      */
     public function execute()
     {
@@ -289,69 +359,52 @@ class Cron
 
         foreach ($websites as $code => $website) {
             if ($this->getDefaultStoreId($website)) {
-                $this->getConfigSettings($code);
                 $this->_currentWebsite = $website;
 
-                if ($this->_ENABLED) {
-                    if ($this->_ENABLE_LOGGING) {
-                        $this->_logger->info(__('WinMan synchronisation started for website: ') . $website->getName() . '.');
+                if ($this->_helper->getEnabled($code)) {
+                    if ($this->_helper->getEnableLogging($code)) {
+                        $this->_logger->info(__('WinMan synchronisation started for website') . ': ' . $website->getName());
                     }
 
-                    if ($this->_ENABLE_PRODUCTS) {
+                    if ($this->_helper->getEnableProducts($code)) {
                         $this->fetchProducts();
                     }
 
-                    if ($this->_ENABLE_CATEGORIES) {
+                    if ($this->_helper->getEnableProductCategories($code)) {
                         $this->fetchCategories();
                     }
 
-                    if ($this->_ENABLE_CUSTOMERS) {
+                    if ($this->_helper->getEnableCustomers($code)) {
                         $this->fetchCustomers();
                     }
 
-                    $this->disableFullUpdates($website->getid());
+                    $this->disableFullUpdates($website->getId());
 
-                    if ($this->_ENABLE_LOGGING) {
-                        $this->_logger->info(__('WinMan synchronisation finished for website: ') . $website->getName() . '.');
+                    if ($this->_helper->getEnableLogging($code)) {
+                        $this->_logger->info(__('WinMan synchronisation finished for website') . ': ' . $website->getName());
                     }
                 }
             }
         }
-        return $this;
+
+        if ($this->_finishWithErrors) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning(__('WinMan cron job finished with errors'));
+            }
+            throw new \Exception(__('WinMan cron job finished with errors'));
+        } else {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->info(__('WinMan cron job finished successfully'));
+            }
+            return $this;
+        }
     }
 
     /**
-     * @param $websiteCode
-     */
-    private function getConfigSettings($websiteCode)
-    {
-        $this->_WINMAN_WEBSITE = $this->_helper->getconfig('winman_bridge/general/winman_website', $websiteCode);
-        $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $websiteCode);
-        $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $websiteCode);
-        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
-        $this->_ENABLE_LOGGING = $this->_helper->getconfig('winman_bridge/general/enable_logging', $websiteCode);
-
-        $this->_ENABLE_PRODUCTS = $this->_helper->getconfig('winman_bridge/products/enable_products', $websiteCode);
-        $this->_ENABLE_STOCK = $this->_helper->getconfig('winman_bridge/products/enable_stock', $websiteCode);
-        $this->_ENABLE_IMAGES = $this->_helper->getconfig('winman_bridge/products/enable_product_images', $websiteCode);
-        $this->_ENABLE_CATEGORIES = $this->_helper->getconfig('winman_bridge/products/enable_product_categories', $websiteCode);
-        $this->_ENABLE_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/enable_customers', $websiteCode);
-        $this->_EMAIL_CUSTOMERS = $this->_helper->getconfig('winman_bridge/customers/email_customers', $websiteCode);
-
-        $this->_FULL_PRODUCT_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_update', $websiteCode);
-        $this->_FULL_CATEGORY_UPDATE = $this->_helper->getconfig('winman_bridge/products/full_product_category_update', $websiteCode);
-        $this->_FULL_CUSTOMER_UPDATE = $this->_helper->getconfig('winman_bridge/customers/full_customer_update', $websiteCode);
-
-        $headers = array();
-        $headers[] = 'accept: application/json';
-        $headers[] = 'authorization: Bearer ' . $this->_ACCESS_TOKEN;
-
-        $this->_CURL_HEADERS = $headers;
-    }
-
-    /**
-     * @param $website
-     * @return bool
+     * Retrieve the default store ID for the specified website.
+     *
+     * @param \Magento\Store\Api\Data\WebsiteInterface $website
+     * @return integer|boolean
      */
     private function getDefaultStoreId($website)
     {
@@ -365,18 +418,28 @@ class Cron
     }
 
     /**
-     * @return null|string
-     * @throws \Magento\Framework\Exception\LocalizedException
+     * Retrieve the default product attribute set.
+     *
+     * @return integer|boolean
      */
     private function getDefaultProductAttributeSetId()
     {
-        return $this->_eavConfig
-            ->getEntityType(ProductAttributeInterface::ENTITY_TYPE_CODE)
-            ->getDefaultAttributeSetId();
+        try {
+            return $this->_eavConfig
+                ->getEntityType('catalog_product')
+                ->getDefaultAttributeSetId();
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
     }
 
     /**
-     * @return false|int
+     * Retrieve the timestamp of the last successful run of the WinMan cron job.
+     *
+     * @return integer
      */
     private function getLastExecutedTimestamp()
     {
@@ -401,11 +464,14 @@ class Cron
     }
 
     /**
-     * @param $websiteId
+     * Ensure all of the full update config settings are set to 'No'
+     * after the cron job has finished running
+     *
+     * @param integer $websiteId
      */
     private function disableFullUpdates($websiteId)
     {
-        $websiteScope = ScopeInterface::SCOPE_WEBSITES;
+        $websiteScope = 'store';
         $defaultScope = 'default';
 
         $this->_configInterface->saveConfig('winman_bridge/products/full_product_update', 0, $defaultScope, 0);
@@ -420,71 +486,62 @@ class Cron
     }
 
     /**
-     * @param $apiUrl
-     * @return mixed
-     */
-    private function executeCurl($apiUrl)
-    {
-        $curl = curl_init($apiUrl);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->_CURL_HEADERS);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        $response = curl_exec($curl);
-
-        if ($this->_ENABLE_LOGGING && !$response) {
-            $this->_logger->critical('Error: "' . curl_error($curl) . '" - Code: ' . curl_errno($curl));
-        }
-
-        $decoded = json_decode($response);
-        curl_close($curl);
-
-        return $decoded;
-    }
-
-    /**
-     * @param int $page
-     * @throws \Magento\Framework\Exception\InputException
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
-     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
+     * Fetch paged product data from the WinMan REST API.
+     *
+     * @param integer $page
      */
     private function fetchProducts($page = 1)
     {
         $size = 10;
 
-        $apiUrl = $this->_API_BASEURL . '/products?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/products?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&page=' . $page . '&size=' . $size;
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_PRODUCT_UPDATE) {
+        if (!$this->_helper->getFullProductUpdate($this->_currentWebsite->getCode())) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
-        if (count($response->Products) > 0) {
+        if (isset($response->Products) && count($response->Products) > 0) {
             foreach ($response->Products as $key => $product) {
-                $this->updateProductCatalog($product);
+                if (!$this->updateProductCatalog($product)) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning(__('Could not update product') . ': ' . $product->Sku);
+                    }
+                    $this->_finishWithErrors = true;
+                }
             }
             $page += 1;
             $this->fetchProducts($page);
         }
+
+        if (empty($response)) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning(__('Could not retrieve product data from WinMan'));
+            }
+            $this->_finishWithErrors = true;
+        }
     }
 
     /**
-     * @param $sku
+     * Fetch product images from the WinMan REST API for the specified product SKU.
+     *
+     * @param string $sku
      * @return array
      */
     private function fetchProductImages($sku)
     {
-        $apiUrl = $this->_API_BASEURL . '/productattachments?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/productattachments?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&sku=' . urlencode($sku);
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
-        if (count($response->ProductAttachments) > 0) {
+        if (isset($response->ProductAttachments) && count($response->ProductAttachments) > 0) {
             return $response->ProductAttachments[0]->Attachments;
         }
 
@@ -492,108 +549,148 @@ class Cron
     }
 
     /**
-     * @param $sku
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Retrieve stock level information from the WinMan REST API for the specified product SKU.
+     *
+     * @param string $sku
      */
     private function fetchStockLevels($sku)
     {
-        $apiUrl = $this->_API_BASEURL . '/productinventories?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/productinventories?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&sku=' . urlencode($sku);
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
-        if (count($response->Inventories) > 0) {
+        if (isset($response->Inventories) && count($response->Inventories) > 0) {
             foreach ($response->Inventories as $inventory) {
-                $this->updateStock($inventory);
+                if (!$this->updateStock($inventory)) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning(__('Could not update stock level information for product') . ': ' . $inventory->ProductSku);
+                    }
+                    $this->_finishWithErrors = true;
+                }
             }
+        }
+
+        if (empty($response)) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning(__('Could not retrieve product stock level data from WinMan'));
+            }
+            $this->_finishWithErrors = true;
         }
     }
 
     /**
-     * @param int $page
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Fetch paged product category data from the WinMan REST API.
+     *
+     * @param integer $page
      */
     private function fetchCategories($page = 1)
     {
         $size = 10;
 
-        $apiUrl = $this->_API_BASEURL . '/productcategories?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/productcategories?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&page=' . $page . '&size=' . $size;
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_CATEGORY_UPDATE) {
+        if (!$this->_helper->getFullProductCategoryUpdate($this->_currentWebsite->getCode())) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
-        if (count($response->ProductCategories) > 0) {
+        if (isset($response->ProductCategories) && count($response->ProductCategories) > 0) {
             foreach ($response->ProductCategories as $category) {
-                $this->updateCategories($category);
+                if (!$this->updateCategories($category)) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning(__('Could not update category') . ': ' . $category->CategoryName);
+                    }
+                    $this->_finishWithErrors = true;
+                }
             }
             $page += 1;
             $this->fetchCategories($page);
         }
+
+        if (empty($response)) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning(__('Could not retrieve product category data from WinMan'));
+            }
+            $this->_finishWithErrors = true;
+        }
     }
 
     /**
-     * @param int $page
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Fetch paged customer data from the WinMan REST API.
+     *
+     * @param integer $page
      */
     private function fetchCustomers($page = 1)
     {
         $size = 10;
 
-        $apiUrl = $this->_API_BASEURL . '/customers?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/customers?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&page=' . $page . '&size=' . $size;
 
         $seconds = $this->_timezoneInterface->scopeTimeStamp() - $this->_lastExecutedTimestamp;
 
-        if (!$this->_FULL_CUSTOMER_UPDATE) {
+        if (!$this->_helper->getFullCustomerUpdate($this->_currentWebsite->getCode())) {
             $apiUrl .= '&modified=' . $seconds;
         }
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
-        if (count($response->Customers) > 0) {
+        if (isset($response->Customers) && count($response->Customers) > 0) {
             foreach ($response->Customers as $customer) {
-                $this->updateCustomers($customer);
+                if (!$this->updateCustomers($customer)) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning(__('Could not update customer') . ': ' . $customer->CustomerId . '-' . $customer->Branch);
+                    }
+                    $this->_finishWithErrors = true;
+                }
             }
             $page += 1;
             $this->fetchCustomers($page);
         }
+
+        if (empty($response)) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning(__('Could not retrieve customer data from WinMan'));
+            }
+            $this->_finishWithErrors = true;
+        }
     }
 
     /**
-     * @param $guid
+     * Fetch price list data from the WinMan REST API for the specified Customer GUID.
+     *
+     * @param string $guid
      * @return mixed
      */
     private function fetchCustomerPriceList($guid)
     {
-        $apiUrl = $this->_API_BASEURL . '/customerpricelists?website='
-            . urlencode($this->_WINMAN_WEBSITE)
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/customerpricelists?website='
+            . urlencode($this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()))
             . '&guid=' . $guid;
 
-        $response = $this->executeCurl($apiUrl);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl);
 
         return $response;
     }
 
     /**
-     * @param $data
-     * @throws \Magento\Framework\Exception\InputException
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
-     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
+     * Update the Magento product catalog using the data from the WinMan REST API.
+     *
+     * @param mixed $data
+     * @return boolean
      */
     private function updateProductCatalog($data)
     {
+        $success = true;
+
         /**
          * Using _productRepository->save() at global scope forces product to be saved to all websites.
          * We don't necessarily want this, so we need to keep track of which website(s) the product belongs to.
@@ -610,24 +707,36 @@ class Cron
             $taxClasses->addFieldToFilter('class_name', 'Default');
         }
 
-        $taxClassId = ($data->Taxable) ? $taxClasses->getFirstItem()->getId() : 0;
-        $taxClassId = ($taxClassId) ? $taxClassId : 0;
+        try {
+            $taxClassId = ($data->Taxable) ? $taxClasses->getFirstItem()->getId() : 0;
+            $taxClassId = ($taxClassId) ? $taxClassId : 0;
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
 
         /** If product already exists, update it. */
-        if ($this->_productModel->getIdBySku($data->Sku)) {
+        try {
             $product = $this->_productRepository->get($data->Sku);
             $websiteIds = $product->getWebsiteIds();
             $product = $this->setProductData($product, $data, $taxClassId, false);
-        } else { /** Otherwise, create a new one. */
+        } catch (\Exception $e) {
+            /** Otherwise, create a new one. */
             $product = $this->_productFactory->create();
             $product = $this->setProductData($product, $data, $taxClassId, true);
+        }
+
+        if (!$product) {
+            return false;
         }
 
         $websiteIds[] = $this->_currentWebsite->getId();
         $websiteIds = array_unique($websiteIds);
         $addedWebsites = array_diff($product->getWebsiteIds(), $websiteIds);
 
-        if ($this->_ENABLE_IMAGES) {
+        if ($this->_helper->getEnableProductImages($this->_currentWebsite->getCode())) {
             /** Remove existing images. */
             $mediaGalleryEntries = $product->getMediaGalleryEntries();
             foreach ($mediaGalleryEntries as $key => $entry) {
@@ -638,19 +747,22 @@ class Cron
             try {
                 $product = $this->_productRepository->save($product);
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->critical($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
 
             /** Add new / updated images. */
             $attachments = $this->fetchProductImages($data->Sku);
             foreach ($attachments as $key => $attachment) {
-                $this->saveProductImage($product, $attachment);
+                if (!$this->saveProductImage($product, $attachment)) {
+                    $success = false;
+                }
             }
         }
 
-        if ($this->_ENABLE_STOCK) {
+        if ($this->_helper->getEnableStock($this->_currentWebsite->getCode())) {
             /** Set stock level. */
             $this->fetchStockLevels($data->Sku);
         }
@@ -659,26 +771,32 @@ class Cron
             /** Remove the product from any unnecessary websites. */
             $this->_productWebsiteFactory->create()->removeProducts($addedWebsites, [$product->getId()]);
         } catch (\Exception $e) {
-            if ($this->_ENABLE_LOGGING) {
-                $this->_logger->critical($e->getMessage());
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
             }
+            return false;
         }
+
+        return $success;
     }
 
+
     /**
-     * @param $product
-     * @param $data
-     * @param $taxClassId
-     * @param bool $isNew
-     * @return \Magento\Catalog\Api\Data\ProductInterface|mixed
-     * @throws \Magento\Framework\Exception\InputException
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
-     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
+     * Set and save the product data for the specified product, returning the saved product.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param mixed $data
+     * @param integer $taxClassId
+     * @param boolean $isNew
+     * @return boolean|\Magento\Catalog\Api\Data\ProductInterface
      */
     private function setProductData($product, $data, $taxClassId, $isNew = false)
     {
         $defaultAttributeSetId = $this->getDefaultProductAttributeSetId();
+
+        if (!$defaultAttributeSetId) {
+            return false;
+        }
 
         /** Add product prices from Price Lists. */
         $prices = [];
@@ -691,6 +809,10 @@ class Cron
 
                 /** Make sure a customer group exists with the same name as the price list. */
                 $customerGroupId = $this->getCustomerGroupId($priceList->PriceListId);
+
+                if (!$customerGroupId) {
+                    return false;
+                }
 
                 /** Set the quantity to at least 1. */
                 $quantity = ($priceList->ProductPrices[0]->Quantity <= 1) ? 1 : floatval($priceList->ProductPrices[0]->Quantity);
@@ -708,9 +830,9 @@ class Cron
 
         $product
             ->setAttributeSetId($defaultAttributeSetId)
-            ->setTypeId(Product\Type::TYPE_SIMPLE)
-            ->setVisibility(Product\Visibility::VISIBILITY_BOTH)
-            ->setStatus(Product\Attribute\Source\Status::STATUS_ENABLED)
+            ->setTypeId('simple')
+            ->setVisibility(4)
+            ->setStatus(1)
             ->setName(ucwords(strtolower($data->Name)))
             ->setWeight($data->Weight)
             ->setDescription($data->LongDescription)
@@ -746,17 +868,21 @@ class Cron
         try {
             $product = $this->_productRepository->save($product);
         } catch (\Exception $e) {
-            if ($this->_ENABLE_LOGGING) {
-                $this->_logger->critical($e->getMessage());
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
             }
+            return false;
         }
 
         return $product;
     }
 
     /**
-     * @param $sku
-     * @param $options
+     * Create the data array for the specified product's customisable options
+     * using options data from the WinMan REST API.
+     *
+     * @param string $sku
+     * @param array $options
      * @return array
      */
     private function createCustomOptionsArray($sku, $options)
@@ -801,8 +927,11 @@ class Cron
     }
 
     /**
-     * @param $product
-     * @param $imageData
+     * Save the specified image for the specified product.
+     *
+     * @param \Magento\Catalog\Api\Data\ProductInterface $product
+     * @param mixed $imageData
+     * @return boolean
      */
     private function saveProductImage($product, $imageData)
     {
@@ -823,9 +952,10 @@ class Cron
             try {
                 $product->save();
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->critical($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
 
             if ($product->getThumbnail() == 'no_selection') {
@@ -841,22 +971,37 @@ class Cron
                 try {
                     $product->save();
                 } catch (\Exception $e) {
-                    if ($this->_ENABLE_LOGGING) {
-                        $this->_logger->critical($e->getMessage());
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning($e->getMessage());
                     }
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
     /**
-     * @param $inventory
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Update product stock level information using data from the
+     * WinMan REST API.
+     *
+     * @param mixed $inventory
+     * @return boolean
      */
     private function updateStock($inventory)
     {
         $sku = $inventory->ProductSku;
-        $stockItem = $this->_stockRegistry->getStockItemBySku($sku);
+
+        try {
+            $stockItem = $this->_stockRegistry->getStockItemBySku($sku);
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
+
         $stock = 0;
 
         if (count($inventory->ProductInventories) > 0) {
@@ -869,42 +1014,58 @@ class Cron
             ->setManageStock(true)
             ->setUseConfigManageStock(true)
             ->setIsQtyDecimal(true)
-            ->setIsInStock((bool)$stock);
+            ->setIsInStock((boolean)$stock);
 
         try {
             $this->_stockRegistry->updateStockItemBySku($sku, $stockItem);
         } catch (\Exception $e) {
-            if ($this->_ENABLE_LOGGING) {
-                $this->_logger->critical($e->getMessage());
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
             }
+            return false;
         }
+
+        return true;
     }
 
     /**
-     * @param null $groupName
-     * @return int|null
-     * @throws \Magento\Framework\Exception\InputException
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
-     * @throws \Magento\Framework\Exception\State\InvalidTransitionException
+     * Get the ID of the customer group with the specified name.
+     * If the group does not exist, create it.
+     *
+     * @param string|null $groupName
+     * @return integer|boolean
      */
     private function getCustomerGroupId($groupName = null)
     {
         /** If group name is null, get the default customer group, else, check if group exists. */
         if (is_null($groupName)) {
             $defaultStoreId = $this->getDefaultStoreId($this->_currentWebsite);
-            $groupId = $this->_groupManagementInterface
-                ->getDefaultGroup($defaultStoreId)
-                ->getId();
 
-            return $groupId;
+            try {
+                $groupId = $this->_groupManagementInterface
+                    ->getDefaultGroup($defaultStoreId)
+                    ->getId();
+                return $groupId;
+            } catch (\Exception $e) {
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
+                }
+                return false;
+            }
         }
 
-        $groupId = $this->_customerGroupCollectionFactory
-            ->create()
-            ->addFieldToFilter('customer_group_code', $groupName)
-            ->getFirstItem()
-            ->getId();
+        try {
+            $groupId = $this->_customerGroupCollectionFactory
+                ->create()
+                ->addFieldToFilter('customer_group_code', $groupName)
+                ->getFirstItem()
+                ->getId();
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
 
         /** If the customer group does not exist, create it. */
         if (!$groupId) {
@@ -912,14 +1073,28 @@ class Cron
                 ->addFieldToFilter('class_type', 'CUSTOMER')
                 ->addFieldToFilter('class_name', 'Retail Customer');
 
-            $taxClassId = $taxClasses->getFirstItem()->getId();
-            $taxClassId = ($taxClassId) ? $taxClassId : 0;
+            try {
+                $taxClassId = $taxClasses->getFirstItem()->getId();
+                $taxClassId = ($taxClassId) ? $taxClassId : 0;
+            } catch (\Exception $e) {
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
+                }
+                return false;
+            }
 
             $group = $this->_customerGroupFactory->create();
             $group->setCode($groupName)
                 ->setTaxClassId($taxClassId);
 
-            $group = $this->_customerGroupRepository->save($group);
+            try {
+                $group = $this->_customerGroupRepository->save($group);
+            } catch (\Exception $e) {
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
+                }
+                return false;
+            }
 
             $groupId = $group->getId();
         }
@@ -928,16 +1103,17 @@ class Cron
     }
 
     /**
-     * @param $data
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Update product categories with data from the WinMan REST API.
+     *
+     * @param mixed $data
+     * @return boolean
      */
     private function updateCategories($data)
     {
         /** Save image to file. */
         $fileName = null;
-        if (!empty($data->CategoryImage)) {
 
+        if (!empty($data->CategoryImage)) {
             if (!file_exists($this->_mediaPath . 'catalog/category')) {
                 mkdir($this->_mediaPath . 'catalog/category', 0777, true);
             }
@@ -967,6 +1143,10 @@ class Cron
             null,
             $data->CategoryPath);
 
+        if ($existingCategoryId === false) {
+            return false;
+        }
+
         if ($existingCategoryId === 0) {
             /**
              * Create new category.
@@ -979,13 +1159,28 @@ class Cron
             foreach ($parents as $key => $parent) {
                 unset($parentCatId);
 
-                $parentCategory = $this->_categoryCollectionFactory
-                    ->create()
-                    ->addAttributeToFilter('name', $parent)
-                    ->addAttributeToFilter('parent_id', $parentId)
-                    ->getFirstitem();
+                try {
+                    $parentCategory = $this->_categoryCollectionFactory
+                        ->create()
+                        ->addAttributeToFilter('name', $parent)
+                        ->addAttributeToFilter('parent_id', $parentId)
+                        ->getFirstitem();
+                } catch (\Exception $e) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning($e->getMessage());
+                    }
+                    return false;
+                }
 
-                $parentCatId = $parentCategory->getId();
+                try {
+                    $parentCatId = $parentCategory->getId();
+                } catch (\Exception $e) {
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning($e->getMessage());
+                    }
+                    return false;
+                }
+
                 if (!isset($parentCatId)) {
                     /** Create the category. */
                     $newCategory = $this->_categoryFactory->create();
@@ -997,9 +1192,10 @@ class Cron
                     try {
                         $newCategory = $this->_categoryRepository->save($newCategory);
                     } catch (\Exception $e) {
-                        if ($this->_ENABLE_LOGGING) {
-                            $this->_logger->critical($e->getMessage());
+                        if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                            $this->_logger->warning($e->getMessage());
                         }
+                        return false;
                     }
 
                     $parentId = $newCategory->getId();
@@ -1011,121 +1207,143 @@ class Cron
 
             $new = $this->_categoryFactory->create();
 
-            $new->setUrlKey(urlencode($data->CategoryName))
-                ->setParentId($parentId)
-                ->setName($data->CategoryName)
-                ->setGuid($data->CategoryGuid)
-                ->setDescription($data->MetaDescription)
-                ->setMetaTitle($data->MetaTitle)
-                ->setMetaDescription($data->MetaDescription)
-                ->setMetaKeywords($data->MetaKeywords)
-                ->setImage($fileName, array('image', 'small_image', 'thumbnail'), false, false)
-                ->setIsActive(true);
-
             try {
+                $new->setUrlKey(urlencode($data->CategoryName))
+                    ->setParentId($parentId)
+                    ->setName($data->CategoryName)
+                    ->setGuid($data->CategoryGuid)
+                    ->setDescription($data->MetaDescription)
+                    ->setMetaTitle($data->MetaTitle)
+                    ->setMetaDescription($data->MetaDescription)
+                    ->setMetaKeywords($data->MetaKeywords)
+                    ->setImage($fileName, array('image', 'small_image', 'thumbnail'), false, false)
+                    ->setIsActive(true);
+
                 $new = $this->_categoryRepository->save($new);
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->critical($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
 
             $existingCategoryId = $new->getId();
         } else if (isset($existingCategoryId)) {
             /** Update existing category. */
-
-            $existingCategory = $this->_categoryRepository
-                ->get($existingCategoryId)
-                ->setUrlKey(urlencode($data->CategoryName))
-                ->setName($data->CategoryName)
-                ->setGuid($data->CategoryGuid)
-                ->setDescription($data->MetaDescription)
-                ->setMetaTitle($data->MetaTitle)
-                ->setMetaDescription($data->MetaDescription)
-                ->setMetaKeywords($data->MetaKeywords)
-                ->setImage($fileName, array('image', 'small_image', 'thumbnail'), false, false)
-                ->setIsActive(true);
-
             try {
+                $existingCategory = $this->_categoryRepository
+                    ->get($existingCategoryId)
+                    ->setUrlKey(urlencode($data->CategoryName))
+                    ->setName($data->CategoryName)
+                    ->setGuid($data->CategoryGuid)
+                    ->setDescription($data->MetaDescription)
+                    ->setMetaTitle($data->MetaTitle)
+                    ->setMetaDescription($data->MetaDescription)
+                    ->setMetaKeywords($data->MetaKeywords)
+                    ->setImage($fileName, array('image', 'small_image', 'thumbnail'), false, false)
+                    ->setIsActive(true);
+
                 $this->_categoryRepository->save($existingCategory);
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->critical($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
         }
 
         /** Add products to category. */
-        if (isset($existingCategoryId)) {
-            $this->populateCategoryProducts($data->Products, $existingCategoryId);
-        }
+        return $this->populateCategoryProducts($data->Products, $existingCategoryId);
     }
 
     /**
+     * Check if the specified product category already exists in Magento.
+     *
      * @param string|null $guid
      * @param string|null $name
-     * @param int|null $parentId
+     * @param integer|null $parentId
      * @param string|null $path
-     * @return int
-     * @throws \Magento\Framework\Exception\LocalizedException
+     * @return integer|boolean
      */
-    private function findExistingCategory(string $guid = null, string $name = null, int $parentId = null, string $path = null)
+    private function findExistingCategory($guid = null, $name = null, $parentId = null, $path = null)
     {
         $category = $this->_categoryCollectionFactory->create();
 
-        if (!is_null($guid)) {
-            $category->addAttributeToFilter('guid', $guid);
-        } else if (!is_null($name) && !is_null($path)) {
-            $pathArray = explode('/', $path);
-            $level = count($pathArray) + 1;
-            $category->addAttributeToFilter('name', $name)
-                ->addAttributeToFilter('level', $level);
-        } else if (!is_null($name) && !is_null($parentId)) {
-            $category->addAttributeToFilter('name', $name)
-                ->addAttributeToFilter('parent_id', $parentId);
-        } else {
-            return 0;
+        try {
+            if (!is_null($guid)) {
+                $category->addAttributeToFilter('guid', $guid);
+            } else if (!is_null($name) && !is_null($path)) {
+                $pathArray = explode('/', $path);
+                $level = count($pathArray) + 1;
+                $category->addAttributeToFilter('name', $name)
+                    ->addAttributeToFilter('level', $level);
+            } else if (!is_null($name) && !is_null($parentId)) {
+                $category->addAttributeToFilter('name', $name)
+                    ->addAttributeToFilter('parent_id', $parentId);
+            } else {
+                return 0;
+            }
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
         }
 
         $category = $category->getFirstItem();
-        $categoryId = $category->getId();
+
+        try {
+            $categoryId = $category->getId();
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
 
         $result = (isset($categoryId)) ? $categoryId : 0;
 
         if ($result === 0 && !is_null($guid) && !is_null($name) && !is_null($path)) {
             $result = $this->findExistingCategory(null, $name, null, $path);
         }
-        return $result; /** return category ID (int), or 0 if category does not exist. */
+
+        return $result;
     }
 
     /**
+     * Assign specified products to the specified product category.
+     *
      * @param array $products
-     * @param int $categoryId
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @param integer $categoryId
+     * @return boolean
      */
-    private function populateCategoryProducts(array $products, int $categoryId)
+    private function populateCategoryProducts($products, $categoryId)
     {
         foreach ($products as $item) {
-            $product = $this->_productRepository->get($item->ProductSku);
-            $categories = $this->_productResource->getCategoryIds($product);
-
-            $categories[] = $categoryId;
-
             try {
+                $product = $this->_productRepository->get($item->ProductSku);
+                $categories = $product->getCategoryIds($product);
+
+                $categories[] = $categoryId;
+
                 $this->_categoryLinkManagement
                     ->assignProductToCategories($item->ProductSku, $categories);
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->notice($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
         }
+
+        return true;
     }
 
     /**
-     * @param $data
-     * @throws \Magento\Framework\Exception\LocalizedException
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * Update Magento customer information with data from the WinMan REST API.
+     *
+     * @param mixed $data
+     * @return boolean
      */
     private function updateCustomers($data)
     {
@@ -1133,17 +1351,24 @@ class Cron
             $allowCommunication = ($contact->AllowCommunication) ? 1 : 0;
 
             $priceList = $this->fetchCustomerPriceList($data->Guid);
+
             if (isset($priceList->CustomerPriceLists[0]->PriceList->PriceListId)) {
                 $priceListId = $priceList->CustomerPriceLists[0]->PriceList->PriceListId;
             } else {
                 $priceListId = null;
             }
 
-            $groupId = $this->getCustomerGroupId($priceListId);
+            try {
+                $groupId = $this->getCustomerGroupId($priceListId);
+            } catch (\Exception $e) {
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
+                }
+                return false;
+            }
 
             /** Check if the customer already exists. */
-            if ($this->_customerModel->setWebsiteId($this->_currentWebsite->getId())->loadByEmail($contact->WebsiteUserName)->getId()) {
-                /** If the customer exists, update their details. */
+            try {
                 $customer = $this->_customerRepository->get($contact->WebsiteUserName, $this->_currentWebsite->getId());
 
                 $customer
@@ -1155,14 +1380,9 @@ class Cron
                     ->setDisableAutoGroupChange(1)
                     ->setTaxvat($data->TaxNumber)
                     ->setGroupId($groupId);
-                try {
-                    $customer = $this->_customerRepository->save($customer);
-                } catch (\Exception $e) {
-                    if ($this->_ENABLE_LOGGING) {
-                        $this->_logger->alert($e->getMessage());
-                    }
-                }
-            } else {
+
+                $customer = $this->_customerRepository->save($customer);
+            } catch (\Exception $e) {
                 /** If the customer does not exist, create a new one. */
                 $customer = $this->_customerFactory->create();
 
@@ -1177,7 +1397,7 @@ class Cron
                     ->setGroupId($groupId);
 
                 try {
-                    $newCustomer = $customer->save();
+                    $this->_customerRepository->save($customer);
 
                     /**
                      * A bug in Magento prevents saving custom attribute data on
@@ -1190,22 +1410,32 @@ class Cron
 
                     $customer = $this->_customerRepository->save($customer);
 
-                    if ($this->_EMAIL_CUSTOMERS) {
-                        $this->sendWelcomeEmail($newCustomer);
+                    if ($this->_helper->getEmailCustomers($this->_currentWebsite->getCode())) {
+                        if (!$this->sendWelcomeEmail($customer)) {
+                            return false;
+                        }
                     }
                 } catch (\Exception $e) {
-                    if ($this->_ENABLE_LOGGING) {
-                        $this->_logger->alert($e->getMessage());
+                    if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                        $this->_logger->warning($e->getMessage());
                     }
+                    return false;
                 }
             }
 
-            $this->updateCustomerAddresses($customer, $data, $contact);
+            if (!$this->updateCustomerAddresses($customer, $data, $contact)) {
+                return false;
+            }
         }
+
+        return true;
     }
 
     /**
-     * @param $customer
+     * Send a welcome email to the specified customer.
+     *
+     * @param \Magento\Customer\Api\Data\CustomerInterface $customer
+     * @return boolean
      */
     private function sendWelcomeEmail($customer)
     {
@@ -1216,30 +1446,36 @@ class Cron
         $sender = 'customer/create_account/email_identity';
         $templateParams = ['customer' => $customer, 'back_url' => '', 'store' => $defaultStore];
 
-        $templateId = $this->_scopeConfig->getValue($template, ScopeInterface::SCOPE_STORE, $defaultStoreId);
+        $templateId = $this->_scopeConfig->getValue($template, 'store', $defaultStoreId);
 
         $transport = $this->_transportBuilder
             ->setTemplateIdentifier($templateId)
-            ->setTemplateOptions(['area' => Area::AREA_FRONTEND, 'store' => $defaultStoreId])
+            ->setTemplateOptions(['area' => 'frontend', 'store' => $defaultStoreId])
             ->setTemplateVars($templateParams)
-            ->setFrom($this->_scopeConfig->getValue($sender, ScopeInterface::SCOPE_STORE, $defaultStoreId))
+            ->setFrom($this->_scopeConfig->getValue($sender, 'store', $defaultStoreId))
             ->addTo($customer->getEmail(), $customer->getName())
             ->getTransport();
 
         try {
             $transport->sendMessage();
         } catch (\Exception $e) {
-            if ($this->_ENABLE_LOGGING) {
-                $this->_logger->alert($e->getMessage());
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
             }
+            return false;
         }
+
+        return true;
     }
 
     /**
-     * @param $customer
-     * @param $data
-     * @param $contact
-     * @throws \Magento\Framework\Exception\LocalizedException
+     * Update the specified customer's address information with data
+     * from the WinMan REST API.
+     *
+     * @param \Magento\Customer\Api\Data\CustomerInterface $customer
+     * @param mixed $data
+     * @param mixed $contact
+     * @return boolean
      */
     private function updateCustomerAddresses($customer, $data, $contact)
     {
@@ -1261,7 +1497,7 @@ class Cron
                 ->setPrefix($contact->Title)
                 ->setFirstname($contact->FirstName)
                 ->setLastname($contact->LastName)
-                ->setStreet(explode('&#xD;&#xA;', $data->Address))
+                ->setStreet(array_slice(explode('&#xD;&#xA;', $data->Address), 0, 2))
                 ->setCity($data->City)
                 ->setPostcode($data->PostalCode)
                 ->setTelephone($contact->PhoneNumberWork)
@@ -1272,37 +1508,52 @@ class Cron
             try {
                 $this->_addressRepository->save($address);
             } catch (\Exception $e) {
-                if ($this->_ENABLE_LOGGING) {
-                    $this->_logger->alert($e->getMessage());
+                if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                    $this->_logger->warning($e->getMessage());
                 }
+                return false;
             }
         }
+
+        return true;
     }
 
     /**
-     * @param $data
-     * @param $contact
-     * @param $customerId
-     * @return bool|\Magento\Customer\Api\Data\AddressInterface
-     * @throws \Magento\Framework\Exception\LocalizedException
+     * Check to see if the specified address already exists for the specified customer.
+     * Return the address if it already exists.
+     *
+     * @param mixed $data
+     * @param mixed $contact
+     * @param integer $customerId
+     * @return boolean|\Magento\Customer\Api\Data\AddressInterface
      */
     private function findAddress($data, $contact, $customerId)
     {
         $data->City = ($data->City) ? $data->City : 'Not specified';
         $contact->PhoneNumberWork = ($contact->PhoneNumberWork) ? $contact->PhoneNumberWork : 'Not specified';
 
+        /** The street address can only contain 2 lines in Magento. Remove any additional lines. */
+        $street = implode("\n", array_slice(explode('&#xD;&#xA;', $data->Address), 0, 2));
+
         $searchCriteria = $this->_searchCriteriaBuilder
             ->addFilter('parent_id', $customerId)
             ->addFilter('firstname', $contact->FirstName)
             ->addFilter('lastname', $contact->LastName)
-            ->addFilter('street', str_replace('&#xD;&#xA;', "\n", $data->Address))
+            ->addFilter('street', $street)
             ->addFilter('city', $data->City)
             ->addFilter('postcode', $data->PostalCode)
             ->addFilter('telephone', $contact->PhoneNumberWork)
             ->addFilter('country_id', $data->Country)
             ->create();
 
-        $addresses = $this->_addressRepository->getList($searchCriteria)->getItems();
+        try {
+            $addresses = $this->_addressRepository->getList($searchCriteria)->getItems();
+        } catch (\Exception $e) {
+            if ($this->_helper->getEnableLogging($this->_currentWebsite->getCode())) {
+                $this->_logger->warning($e->getMessage());
+            }
+            return false;
+        }
 
         if (count($addresses) > 0) {
             return $addresses[0];

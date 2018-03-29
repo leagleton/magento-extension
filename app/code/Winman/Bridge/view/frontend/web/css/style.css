@@ -20,13 +20,13 @@ a.wmn-icon-link {
 
 span.wmn-icon,
 span.wmn-icon:hover {
-    font-family: 'luma-icons';
+    font-family: 'luma-icons', sans-serif;
     vertical-align: middle;
 }
 
 span.wmn-print::before {
     content: '\e624';
-    font-family: 'luma-icons';
+    font-family: 'luma-icons', sans-serif;
     font-size: 1.6rem;
     line-height: 1.6rem;
 }

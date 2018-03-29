@@ -8,9 +8,8 @@ namespace Winman\Bridge\Controller\Portal;
 use \Magento\Framework\App\Action\Action;
 use \Magento\Framework\App\Action\Context;
 use \Winman\Bridge\Helper\Data;
-use \Magento\Store\Model\StoreManagerInterface as StoreManager;
+use \Magento\Store\Model\StoreManager;
 use \Magento\Customer\Model\SessionFactory;
-use \Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Quotes
@@ -49,7 +48,7 @@ class Quotes extends Action
      *
      * @param \Magento\Framework\App\Action\Context $context
      * @param \Winman\Bridge\Helper\Data $helper
-     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
+     * @param \Magento\Store\Model\StoreManager $storeManager
      * @param \Magento\Customer\Model\SessionFactory $customerSessionFactory
      */
     public function __construct(
@@ -82,14 +81,21 @@ class Quotes extends Action
     public function execute()
     {
         if (!$this->_customerSessionFactory->create()->isLoggedIn()) {
-            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect = $this->resultFactory->create('redirect');
             $resultRedirect->setUrl('/customer/account/login');
 
             return $resultRedirect;
         }
 
-        if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
-            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+        try {
+            if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
+                $resultRedirect = $this->resultFactory->create('redirect');
+                $resultRedirect->setUrl('/customer/account');
+
+                return $resultRedirect;
+            }
+        } catch (\Exception $e) {
+            $resultRedirect = $this->resultFactory->create('redirect');
             $resultRedirect->setUrl('/customer/account');
 
             return $resultRedirect;
@@ -100,18 +106,25 @@ class Quotes extends Action
         $id = $this->getRequest()->getParam('quoteid');
 
         if (isset($action) && $action == 'convertquote' && isset($id) && isset($reference)) {
-            $postData = array(
-                'Data' => array(
-                    'Website' => $this->_helper->getWinmanWebsite($this->_websiteCode),
-                    'CustomerGuid' => $this->_customerSessionFactory->create()->getCustomer()->getGuid(),
-                    'CustomerOrderNumber' => $reference,
-                    'QuoteId' => $id
-                )
-            );
+            try {
+                $postData = array(
+                    'Data' => array(
+                        'Website' => $this->_helper->getWinmanWebsite($this->_websiteCode),
+                        'CustomerGuid' => $this->_customerSessionFactory->create()->getCustomer()->getGuid(),
+                        'CustomerOrderNumber' => $reference,
+                        'QuoteId' => $id
+                    )
+                );
+            } catch (\Exception $e) {
+                $resultRedirect = $this->resultFactory->create('redirect');
+                $resultRedirect->setUrl('/customer/account');
+
+                return $resultRedirect;
+            }
 
             $this->convertQuote($postData);
 
-            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect = $this->resultFactory->create('redirect');
             $resultRedirect->setUrl('/customerportal/portal/quotes');
 
             return $resultRedirect;

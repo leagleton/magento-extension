@@ -8,7 +8,6 @@ namespace Winman\Bridge\Controller\Portal;
 use \Magento\Framework\App\Action\Action;
 use \Magento\Framework\App\Action\Context;
 use \Magento\Customer\Model\SessionFactory;
-use \Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Orders
@@ -49,14 +48,21 @@ class Orders extends Action
     public function execute()
     {
         if (!$this->_customerSessionFactory->create()->isLoggedIn()) {
-            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+            $resultRedirect = $this->resultFactory->create('redirect');
             $resultRedirect->setUrl('/customer/account/login');
 
             return $resultRedirect;
         }
 
-        if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
-            $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+        try {
+            if (!$this->_customerSessionFactory->create()->getCustomer()->getGuid()) {
+                $resultRedirect = $this->resultFactory->create('redirect');
+                $resultRedirect->setUrl('/customer/account');
+
+                return $resultRedirect;
+            }
+        } catch (\Exception $e) {
+            $resultRedirect = $this->resultFactory->create('redirect');
             $resultRedirect->setUrl('/customer/account');
 
             return $resultRedirect;

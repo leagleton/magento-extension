@@ -46,7 +46,11 @@ class NavigationDelimiter extends Template
             return false;
         }
 
-        if (!$this->_customerSession->getCustomer()->getGuid()) {
+        try {
+            if (!$this->_customerSession->getCustomer()->getGuid()) {
+                return false;
+            }
+        } catch (\Exception $e) {
             return false;
         }
 

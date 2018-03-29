@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
-    <!--<event name="sales_order_state_change_before">-->
     <event name="checkout_onepage_controller_success_action">
         <observer name="Winman_Bridge_Order" instance="Winman\Bridge\Observer\Order"/>
     </event>

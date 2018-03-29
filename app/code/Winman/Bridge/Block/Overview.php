@@ -86,10 +86,14 @@ class Overview extends Template
      */
     private function getAccountOverview()
     {
-        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/accountoverviews?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid();
+        try {
+            $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/accountoverviews?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid();
+        } catch (\Exception $e) {
+            return '';
+        }
 
         $response = $this->_helper->executeCurl($this->_websiteCode, $apiUrl);
 
@@ -107,10 +111,14 @@ class Overview extends Template
      */
     private function getCustomer()
     {
-        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/customers?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid();
+        try {
+            $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/customers?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid();
+        } catch (\Exception $e) {
+            return '';
+        }
 
         $response = $this->_helper->executeCurl($this->_websiteCode, $apiUrl);
 
@@ -128,11 +136,15 @@ class Overview extends Template
      */
     public function getRecentOrders()
     {
-        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/salesorders?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
-            . '&orderby=date&size=5';
+        try {
+            $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/salesorders?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
+                . '&orderby=date&size=5';
+        } catch (\Exception $e) {
+            return '';
+        }
 
         $response = $this->_helper->executeCurl($this->_websiteCode, $apiUrl);
 
@@ -153,11 +165,15 @@ class Overview extends Template
         $invoices = [];
         $page = 1;
 
-        $apiUrlBase = $this->_helper->getApiBaseUrl($this->_websiteCode)
-            . '/statements?website='
-            . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
-            . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
-            . '&orderby=date&size=5';
+        try {
+            $apiUrlBase = $this->_helper->getApiBaseUrl($this->_websiteCode)
+                . '/statements?website='
+                . urlencode($this->_helper->getWinmanWebsite($this->_websiteCode))
+                . '&customerguid=' . $this->_customerSessionFactory->create()->getCustomer()->getGuid()
+                . '&orderby=date&size=5';
+        } catch (\Exception $e) {
+            return '';
+        }
 
         while (count($invoices) < 5) {
             $apiUrl = $apiUrlBase . '&page=' . $page;
