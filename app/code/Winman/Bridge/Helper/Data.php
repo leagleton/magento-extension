@@ -7,7 +7,6 @@ namespace Winman\Bridge\Helper;
 
 use \Magento\Framework\App\Helper;
 use \Winman\Bridge\Logger\Logger as WinmanLogger;
-use \Magento\Store\Model\ScopeInterface;
 
 /**
  * Class Data
@@ -36,15 +35,15 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve config values for the WinMan Bridge.
      *
-     * @param string $configPath The path through the tree of config values, e.g. 'winman_bridge/general/enable'.
-     * @param string $websiteCode The relevant website code.
+     * @param string $configPath
+     * @param string $websiteCode
      * @return mixed
      */
     public function getConfig($configPath, $websiteCode)
     {
         return $this->scopeConfig->getValue(
             $configPath,
-            ScopeInterface::SCOPE_WEBSITES,
+            'websites',
             $websiteCode
         );
     }
@@ -52,7 +51,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/general/enable (Enable Bridge).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnabled($websiteCode)
@@ -66,7 +65,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/general/api_baseurl (API Base URL).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getApiBaseUrl($websiteCode)
@@ -80,7 +79,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/general/winman_website (Website URL).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getWinmanWebsite($websiteCode)
@@ -94,7 +93,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/general/access_token (API Access Token).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getAccessToken($websiteCode)
@@ -108,7 +107,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/general/enable_logging (Enable Bridge Logging).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableLogging($websiteCode)
@@ -122,7 +121,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/enable_products (Fetch Product from WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableProducts($websiteCode)
@@ -136,7 +135,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/enable_stock (Fetch Product Stock Levels from WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableStock($websiteCode)
@@ -150,7 +149,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/enable_product_images (Fetch Product Images from WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableProductImages($websiteCode)
@@ -164,7 +163,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/enable_product_categories (Fetch Product Categories from WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableProductCategories($websiteCode)
@@ -178,7 +177,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/full_product_update (Perform Full Product Update).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getFullProductUpdate($websiteCode)
@@ -192,7 +191,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/products/full_product_category_update (Perform Full Product Category Update).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getFullProductCategoryUpdate($websiteCode)
@@ -206,7 +205,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/customers/enable_customers (Fetch Customers from WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableCustomers($websiteCode)
@@ -220,7 +219,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/customers/email_customers (Send New Customers a Welcome Email).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEmailCustomers($websiteCode)
@@ -234,7 +233,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/customers/full_customer_update (Perform Full Customer Update).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getFullCustomerUpdate($websiteCode)
@@ -248,7 +247,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Retrieve the config value for winman_bridge/sales_orders/enable_salesorders (Push Sales Orders back to WinMan).
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return mixed
      */
     public function getEnableSalesOrders($websiteCode)
@@ -262,7 +261,7 @@ class Data extends Helper\AbstractHelper
     /**
      * Get the necessary cURL headers to perform a cURL request to the WinMan REST API.
      *
-     * @param $websiteCode
+     * @param string $websiteCode
      * @return array
      */
     private function getCurlHeaders($websiteCode)
@@ -283,13 +282,12 @@ class Data extends Helper\AbstractHelper
      * @param string $websiteCode
      * @param string $apiUrl
      * @param mixed|null $data
-     * @param bool $isPut
-     * @param bool $headersOnly
-     * @return mixed|array|bool
+     * @param boolean $isPut
+     * @param boolean $headersOnly
+     * @return mixed|array|boolean
      */
     public function executeCurl($websiteCode, $apiUrl, $data = null, $isPut = false, $headersOnly = false)
     {
-        $this->_winmanLogger->critical($apiUrl);
         $curl = curl_init($apiUrl);
         curl_setopt($curl, CURLOPT_HTTPHEADER, $this->getCurlHeaders($websiteCode));
 

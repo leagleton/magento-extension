@@ -81,7 +81,11 @@ class Current extends \Magento\Framework\View\Element\Html\Link\Current
             return false;
         }
 
-        if (!$this->_customerSession->getCustomer()->getGuid()) {
+        try {
+            if (!$this->_customerSession->getCustomer()->getGuid()) {
+                return false;
+            }
+        } catch (\Exception $e) {
             return false;
         }
 

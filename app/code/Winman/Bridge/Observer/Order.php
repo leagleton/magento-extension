@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Observer;
 
@@ -15,40 +18,67 @@ use \Magento\Framework\Notification\NotifierInterface as Notifier;
 
 /**
  * Class Order
+ *
  * @package Winman\Bridge\Observer
  */
 class Order implements ObserverInterface
 {
-    private $_ACCESS_TOKEN;
-    private $_API_BASEURL;
-    private $_WINMAN_WEBSITE;
-    private $_ENABLED;
-    private $_ENABLE_ORDERS;
-    private $_CURL_HEADERS;
-
-    private $_currentWebsite;
-
+    /**
+     * @var \Winman\Bridge\Logger\Logger
+     */
     protected $_logger;
+
+    /**
+     * @var \Winman\Bridge\Helper\Data
+     */
     protected $_helper;
+
+    /**
+     * @var \Magento\Store\Model\StoreManager
+     */
     protected $_storeManager;
+
+    /**
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
+     */
     protected $_customerRepository;
+
+    /**
+     * @var \Magento\Customer\Api\AddressRepositoryInterface
+     */
     protected $_addressRepository;
+
+    /**
+     * @var \Magento\Directory\Model\CountryFactory
+     */
     protected $_countryFactory;
 
+    /**
+     * @var \Magento\Sales\Model\OrderRepository
+     */
     protected $_orderRepository;
 
+    /**
+     * @var \Magento\Framework\Notification\NotifierInterface
+     */
     protected $_notifier;
 
     /**
+     * @var \Magento\Store\Api\Data\WebsiteInterface
+     */
+    private $_currentWebsite;
+
+    /**
      * Order constructor.
-     * @param Logger $logger
-     * @param Data $helper
-     * @param OrderRepository $orderRepository
-     * @param CustomerRepository $customerRepository
-     * @param AddressRepository $addressRepository
-     * @param CountryFactory $countryFactory
-     * @param StoreManager $storeManager
-     * @param Notifier $notifier
+     *
+     * @param \Winman\Bridge\Logger\Logger $logger
+     * @param \Winman\Bridge\Helper\Data $helper
+     * @param \Magento\Sales\Model\OrderRepository $orderRepository
+     * @param \Magento\Customer\Api\CustomerRepositoryInterface $customerRepository
+     * @param \Magento\Customer\Api\AddressRepositoryInterface $addressRepository
+     * @param \Magento\Directory\Model\CountryFactory $countryFactory
+     * @param \Magento\Store\Model\StoreManager $storeManager
+     * @param \Magento\Framework\Notification\NotifierInterface $notifier
      */
     public function __construct(
         Logger $logger,
@@ -62,56 +92,50 @@ class Order implements ObserverInterface
     {
         $this->_logger = $logger;
         $this->_helper = $helper;
+
         $this->_orderRepository = $orderRepository;
         $this->_customerRepository = $customerRepository;
         $this->_addressRepository = $addressRepository;
         $this->_countryFactory = $countryFactory;
 
         $this->_storeManager = $storeManager;
-
         $this->_notifier = $notifier;
 
         $this->_currentWebsite = $this->_storeManager->getStore()->getWebsite();
-        $websiteCode = $this->_currentWebsite->getCode();
-
-        $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $websiteCode);
-        $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $websiteCode);
-        $this->_WINMAN_WEBSITE = $this->_helper->getconfig('winman_bridge/general/winman_website', $websiteCode);
-        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
-        $this->_ENABLE_ORDERS = $this->_helper->getconfig('winman_bridge/sales_orders/enable_salesorders', $websiteCode);
-
-        $headers = array();
-        $headers[] = 'accept: application/json';
-        $headers[] = 'content-type: application/json';
-        $headers[] = 'authorization: Bearer ' . $this->_ACCESS_TOKEN;
-
-        $this->_CURL_HEADERS = $headers;
     }
 
     /**
-     * @param Observer $observer
+     * Execute the observer.
+     *
+     * @param \Magento\Framework\Event\Observer $observer
      */
     public function execute(Observer $observer)
     {
-        if ($this->_ENABLED && $this->_ENABLE_ORDERS) {
-            $order_ids = $observer->getEvent()->getOrderIds();
-            $order_id = $order_ids[0];
-
+        if ($this->_helper->getEnabled($this->_currentWebsite->getCode()) && $this->_helper->getEnableSalesOrders($this->_currentWebsite->getCode())) {
             try {
+                $order_ids = $observer->getEvent()->getOrderIds();
+                $order_id = $order_ids[0];
                 $order = $this->_orderRepository->get($order_id);
                 $this->postRequest($order);
             } catch (\Exception $e) {
-                $this->_logger->alert($e->getMessage());
+                $this->_logger->warning($e->getMessage());
+
+                $this->_notifier->addMajor(
+                    __('Order could not be placed in WinMan'),
+                    __('Order could not be placed in WinMan. Please check exception logs for more information.')
+                );
             }
         }
     }
 
     /**
-     * @param $order
+     * Post the specified order data to the WinMan REST API.
+     *
+     * @param \Magento\Sales\Api\Data\OrderInterface $order
      */
     public function postRequest($order)
     {
-        $apiUrl = $this->_API_BASEURL . '/salesorders';
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_currentWebsite->getCode()) . '/salesorders';
 
         $orderItems = $order->getAllItems();
         $orderData = $order->getData();
@@ -122,7 +146,7 @@ class Order implements ObserverInterface
 
         $postData = array(
             'Data' => array(
-                'Website' => $this->_WINMAN_WEBSITE,
+                'Website' => $this->_helper->getWinmanWebsite($this->_currentWebsite->getCode()),
                 'TotalOrderValue' => $orderData['grand_total'],
                 'TotalTaxValue' => $orderData['tax_amount'],
                 'Coupon' => $orderData['coupon_code'],
@@ -198,10 +222,10 @@ class Order implements ObserverInterface
 
         $dataString = json_encode($postData);
 
-        $response = $this->executeCurl($apiUrl, $dataString);
+        $response = $this->_helper->executeCurl($this->_currentWebsite->getCode(), $apiUrl, $dataString);
 
         if (isset($response->Response->Status) && $response->Response->Status === 'Success') {
-            $message = __('Order successfully placed in WinMan. WinMan order ID: ') . $response->Response->SalesOrderId;
+            $message = __('Order successfully placed in WinMan. WinMan order ID') . ': ' . $response->Response->SalesOrderId;
             $order->setStatus('complete')->addStatusHistoryComment($message)->save();
             $order->setStatus('complete')->save();
 
@@ -209,22 +233,23 @@ class Order implements ObserverInterface
                 $this->updateCustomerGuid($orderData['customer_email'], $response->Response->CustomerGUID);
             }
         } else {
-            $message = __('Order could not be placed in WinMan. The message from WinMan is: ') . $response->Response->StatusMessage;
+            $message = __('Order could not be placed in WinMan. The message from WinMan is') . ': ' . $response->Response->StatusMessage;
             $order->setStatus('holded')->addStatusHistoryComment($message)->save();
             $order->setStatus('holded')->save();
 
             $this->_notifier->addMajor(
-                'Order could not be placed in WinMan',
-                'Order ' . $orderData['increment_id'] .
-                ' could not be placed in WinMan. The message from WinMan is: '
-                . $response->Response->StatusMessage
+                _('Order could not be placed in WinMan'),
+                _('Order %1 could not be placed in WinMan. The message from WinMan is', $orderData['increment_id'])
+                . ': ' . $response->Response->StatusMessage
             );
         }
     }
 
     /**
-     * @param $address
-     * @param $type
+     * Return the specified address as an array suitable for the WinMan REST API.
+     *
+     * @param \Magento\Sales\Api\Data\OrderAddressInterface $address
+     * @param string $type
      * @return array
      */
     private function getAddress($address, $type = 'shipping')
@@ -240,7 +265,9 @@ class Order implements ObserverInterface
     }
 
     /**
-     * @param $email
+     * Fetch the specified customer's GUID.
+     *
+     * @param string $email
      * @return mixed
      */
     private function getCustomerGuid($email)
@@ -256,8 +283,10 @@ class Order implements ObserverInterface
     }
 
     /**
-     * @param $email
-     * @param $guid
+     * Update the specified customer's GUID with the one returned by the WinMan REST API.
+     *
+     * @param string $email
+     * @param string $guid
      */
     private function updateCustomerGuid($email, $guid)
     {
@@ -266,12 +295,14 @@ class Order implements ObserverInterface
             $customer->setCustomAttribute('guid', $guid);
             $this->_customerRepository->save($customer);
         } catch (\Exception $e) {
-            $this->_logger->alert($e->getMessage());
+            $this->_logger->warning($e->getMessage());
         }
     }
 
     /**
-     * @param $countryId
+     * Retrieve the 3-character country code for the specified country.
+     *
+     * @param integer $countryId
      * @return mixed
      */
     private function getCountryCode($countryId)
@@ -281,29 +312,5 @@ class Order implements ObserverInterface
             ->loadByCode($countryId);
 
         return $country->getData('iso3_code');
-    }
-
-    /**
-     * @param $apiUrl
-     * @param $data
-     * @return mixed|string
-     */
-    private function executeCurl($apiUrl, $data)
-    {
-        $curl = curl_init($apiUrl);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->_CURL_HEADERS);
-        curl_setopt($curl, CURLOPT_POST, true);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        $response = curl_exec($curl);
-
-        if (!$response) {
-            return '';
-        }
-
-        $decoded = json_decode($response);
-        curl_close($curl);
-
-        return $decoded;
     }
 }

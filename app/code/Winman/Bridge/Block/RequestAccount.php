@@ -1,57 +1,60 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Block;
 
-use \Magento\Directory\Block\Data;
 use \Magento\Framework\View\Element\Template;
 use \Magento\Directory\Model\AllowedCountries;
-use \Magento\Store\Model\ScopeInterface;
 use \Magento\Directory\Model\CountryFactory;
-use \Winman\Bridge\Helper\Data as Helper;
+use \Winman\Bridge\Helper\Data;
 
 /**
  * Class RequestAccount
+ *
  * @package Winman\Bridge\Block
  */
 class RequestAccount extends Template
 {
-
-    private $_ENABLED;
-
-    protected $_directoryBlock;
+    /**
+     * @var \Magento\Directory\Model\AllowedCountries
+     */
     protected $_allowedCountries;
+    /**
+     * @var \Magento\Directory\Model\CountryFactory
+     */
     protected $_countryFactory;
+    /**
+     * @var \Winman\Bridge\Helper\Data
+     */
     protected $_helper;
 
     /**
      * RequestAccount constructor.
-     * @param Data $directoryBlock
-     * @param AllowedCountries $allowedCountries
-     * @param CountryFactory $countryFactory
-     * @param Helper $helper
-     * @param Template\Context $context
-     * @param array $data
+     *
+     * @param \Magento\Directory\Model\AllowedCountries $allowedCountries
+     * @param \Magento\Directory\Model\CountryFactory $countryFactory
+     * @param \Winman\Bridge\Helper\Data $helper
+     * @param \Magento\Framework\View\Element\Template\Context $context
      */
     public function __construct(
-        Data $directoryBlock,
         AllowedCountries $allowedCountries,
         CountryFactory $countryFactory,
-        Helper $helper,
-        Template\Context $context,
-        array $data = [])
+        Data $helper,
+        Template\Context $context)
     {
-        parent::__construct($context, $data);
-        $this->_directoryBlock = $directoryBlock;
+        parent::__construct($context);
+
         $this->_allowedCountries = $allowedCountries;
         $this->_countryFactory = $countryFactory;
         $this->_helper = $helper;
-
-        $websiteCode = $this->_storeManager->getStore()->getWebsite()->getCode();
-        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $websiteCode);
     }
 
     /**
-     * @return int
+     * Get the current store ID.
+     *
+     * @return integer
      */
     public function getStoreId()
     {
@@ -59,6 +62,8 @@ class RequestAccount extends Template
     }
 
     /**
+     * Get the action for the Request Account form.
+     *
      * @return string
      */
     public function getFormAction()
@@ -67,18 +72,18 @@ class RequestAccount extends Template
     }
 
     /**
-     * @return bool
+     * Determine whether the WinMan Bridge is enabled.
+     *
+     * @return boolean
      */
     public function isBridgeEnabled()
     {
-        if ($this->_ENABLED) {
-            return true;
-        }
-
-        return false;
+        return $this->_helper->getEnabled($this->_storeManager->getStore()->getWebsite()->getCode());
     }
 
     /**
+     * Get the HTML for the drop-down list of countries.
+     *
      * @return string
      */
     public function getCountries()
@@ -86,7 +91,7 @@ class RequestAccount extends Template
         $html = '<option value="">Please Select...</option>';
 
         $countries = $this->_allowedCountries
-            ->getAllowedCountries(ScopeInterface::SCOPE_STORE, $this->getStoreId());
+            ->getAllowedCountries('store', $this->getStoreId());
 
         foreach ($countries as $code) {
             $country = $this->_countryFactory

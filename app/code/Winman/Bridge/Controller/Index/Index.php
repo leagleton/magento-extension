@@ -1,4 +1,7 @@
 <?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
 
 namespace Winman\Bridge\Controller\Index;
 
@@ -6,31 +9,35 @@ use \Magento\Framework\App\Action\Action;
 use \Magento\Framework\App\Action\Context;
 use \Winman\Bridge\Helper\Data;
 use \Magento\Store\Model\StoreManager;
-use \Magento\Framework\Controller\ResultFactory;
 
 /**
  * Class Index
+ *
  * @package Winman\Bridge\Controller\Index
  */
 class Index extends Action
 {
-    private $_ACCESS_TOKEN;
-    private $_API_BASEURL;
-    private $_WINMAN_WEBSITE;
-    private $_ENABLED;
-    private $_CURL_HEADERS;
-
-    private $_websiteCode;
-
-    protected $_messageManager;
+    /**
+     * @var \Winman\Bridge\Helper\Data
+     */
     protected $_helper;
+
+    /**
+     * @var \Magento\Store\Model\StoreManager
+     */
     protected $_storeManager;
 
     /**
+     * @var string
+     */
+    private $_websiteCode;
+
+    /**
      * Index constructor.
-     * @param Context $context
-     * @param Data $helper
-     * @param StoreManager $storeManager
+     *
+     * @param \Magento\Framework\App\Action\Context $context
+     * @param \Winman\Bridge\Helper\Data $helper
+     * @param \Magento\Store\Model\StoreManager $storeManager
      */
     public function __construct(
         Context $context,
@@ -38,37 +45,28 @@ class Index extends Action
         StoreManager $storeManager)
     {
         parent::__construct($context);
-        $this->_messageManager = $context->getMessageManager();
+
         $this->_helper = $helper;
         $this->_storeManager = $storeManager;
-
         $this->_websiteCode = $this->_storeManager->getStore()->getWebsite()->getCode();
-
-        $this->_ACCESS_TOKEN = $this->_helper->getconfig('winman_bridge/general/access_token', $this->_websiteCode);
-        $this->_API_BASEURL = $this->_helper->getconfig('winman_bridge/general/api_baseurl', $this->_websiteCode);
-        $this->_WINMAN_WEBSITE = $this->_helper->getconfig('winman_bridge/general/winman_website', $this->_websiteCode);
-        $this->_ENABLED = $this->_helper->getconfig('winman_bridge/general/enable', $this->_websiteCode);
-
-        $headers = array();
-        $headers[] = 'accept: application/json';
-        $headers[] = 'content-type: application/json';
-        $headers[] = 'authorization: Bearer ' . $this->_ACCESS_TOKEN;
-
-        $this->_CURL_HEADERS = $headers;
     }
 
+
     /**
-     * @return \Magento\Framework\Controller\ResultInterface
+     * If the form has been submitted, send the data to the WinMan REST API.
+     * Otherwise, render the Request Account form.
+     *
+     * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
      */
     public function execute()
     {
-        if ($this->_ENABLED) {
+        if ($this->_helper->getEnabled($this->_websiteCode)) {
             $post = $this->getRequest()->getPost();
 
             if ($post['firstname']) {
                 $this->postRequest($post);
 
-                $resultRedirect = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+                $resultRedirect = $this->resultFactory->create('redirect');
                 $resultRedirect->setUrl('/requestaccount');
 
                 return $resultRedirect;
@@ -80,16 +78,18 @@ class Index extends Action
     }
 
     /**
-     * @param $data
+     * Send the form data to the WinMan REST API.
+     *
+     * @param mixed $data
      */
     public function postRequest($data)
     {
-        $apiUrl = $this->_API_BASEURL . '/customers';
+        $apiUrl = $this->_helper->getApiBaseUrl($this->_websiteCode) . '/customers';
 
         $communication = (isset($data['allow_communication'])) ? true : false;
         $postData = array(
             'Data' => array(
-                'Website' => $this->_WINMAN_WEBSITE,
+                'Website' => $this->_helper->getWinmanWebsite($this->_websiteCode),
                 'FirstName' => $data['firstname'],
                 'LastName' => $data['lastname'],
                 'WorkPhoneNumber' => $data['phone_number'],
@@ -105,38 +105,14 @@ class Index extends Action
         );
         $dataString = json_encode($postData);
 
-        $response = $this->executeCurl($apiUrl, $dataString);
+        $response = $this->_helper->executeCurl($this->_websiteCode, $apiUrl, $dataString);
 
-        if ($response->Response->Status === 'Error' || $response = '') {
-            $message = __('There was a problem making your request.');
-            $this->_messageManager->addErrorMessage($message);
+        if (isset($response->Response->Status) && $response->Response->Status === 'Success') {
+            $message = __('Your request has been submitted');
+            $this->messageManager->addSuccessMessage($message);
         } else {
-            $message = __('Your request has been submitted.');
-            $this->_messageManager->addSuccessMessage($message);
+            $message = __('There was a problem making your request');
+            $this->messageManager->addErrorMessage($message);
         }
-    }
-
-    /**
-     * @param $apiUrl
-     * @param $data
-     * @return mixed|string
-     */
-    private function executeCurl($apiUrl, $data)
-    {
-        $curl = curl_init($apiUrl);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->_CURL_HEADERS);
-        curl_setopt($curl, CURLOPT_POST, true);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        $response = curl_exec($curl);
-
-        if (!$response) {
-            return '';
-        }
-
-        $decoded = json_decode($response);
-        curl_close($curl);
-
-        return $decoded;
     }
 }
