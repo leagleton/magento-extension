@@ -1,0 +1,37 @@
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Winman_Bridge::css/style.css"/>
+    </head>
+    <body>
+        <referenceBlock name="customer_account_navigation">
+            <block class="Winman\Bridge\Block\NavigationDelimiter" name="customer-account-navigation-delimiter-3"
+                   template="Winman_Bridge::winman/navigation-delimiter.phtml">
+            </block>
+            <block class="Winman\Bridge\Block\Current" name="customer-account-navigation-overview">
+                <arguments>
+                    <argument name="path" xsi:type="string">customerportal/portal/overview</argument>
+                    <argument name="label" xsi:type="string">Account Overview</argument>
+                </arguments>
+            </block>
+            <block class="Winman\Bridge\Block\Current" name="customer-account-navigation-orders">
+                <arguments>
+                    <argument name="path" xsi:type="string">customerportal/portal/orders</argument>
+                    <argument name="label" xsi:type="string">Sales Orders</argument>
+                </arguments>
+            </block>
+            <block class="Winman\Bridge\Block\Current" name="customer-account-navigation-quotes">
+                <arguments>
+                    <argument name="path" xsi:type="string">customerportal/portal/quotes</argument>
+                    <argument name="label" xsi:type="string">Quotes</argument>
+                </arguments>
+            </block>
+            <block class="Winman\Bridge\Block\Current" name="customer-account-navigation-invoices">
+                <arguments>
+                    <argument name="path" xsi:type="string">customerportal/portal/invoices</argument>
+                    <argument name="label" xsi:type="string">Invoices</argument>
+                </arguments>
+            </block>
+        </referenceBlock>
+    </body>
+</page>

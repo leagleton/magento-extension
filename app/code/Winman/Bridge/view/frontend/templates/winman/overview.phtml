@@ -1,0 +1,200 @@
+<?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
+
+/** @var \Winman\Bridge\Block\Overview $block */
+
+$winmanData = $block->getWinmanData();
+$currencySymbol = $block->getCurrencySymbol($winmanData->Customer->Currency->CurrencyId);
+$recentOrders = $block->getRecentOrders();
+$recentInvoices = $block->getRecentInvoices();
+?>
+<div class="block">
+    <div class="block-title"><span><?= __('Account Overview'); ?></span></div>
+    <div class="block-content">
+        <div class="box">
+            <strong class="box-title"><span><?= __('Company Information'); ?></span></strong>
+            <div class="box-content">
+                <div class="box">
+                    <div class="box-content">
+                        <span>
+                            <?= __('Company name') . ':&nbsp;'; ?>
+                        </span>
+                        <br/>
+                        <span>
+                            <?= __('Company reference') . ':&nbsp;'; ?>
+                        </span>
+                    </div>
+                </div>
+                <div class="box">
+                    <div class="box-content">
+                        <span>
+                            <?= $winmanData->Customer->CustomerName; ?>
+                        </span>
+                        <br/>
+                        <span>
+                            <?= $winmanData->Customer->CustomerId . '-' . $winmanData->Customer->Branch; ?>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="box">
+            <strong class="box-title"><span><?= __('Finances'); ?></span></strong>
+            <div class="box-content">
+                <div class="box">
+                    <div class="box-content">
+                        <span>
+                            <?= __('Account balance') . ':&nbsp;'; ?>
+                        </span>
+                        <br/>
+                        <span>
+                            <?= __('Overdue balance') . ':&nbsp;'; ?>
+                        </span>
+                    </div>
+                </div>
+                <div class="box">
+                    <div class="box-content">
+                        <span class="<?= (floatval($winmanData->AccountOverview->AccountBalance) < 0) ? 'negative' : 'positive'; ?>">
+                            <?= $currencySymbol . number_format((float)$winmanData->AccountOverview->AccountBalance, 2, '.', ','); ?>
+                        </span>
+                        <br/>
+                        <span class="<?= (floatval($winmanData->AccountOverview->OverdueBalance) < 0) ? 'negative' : 'positive'; ?>">
+                            <?= $currencySymbol . number_format((float)$winmanData->AccountOverview->OverdueBalance, 2, '.', ','); ?>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="block">
+    <div class="block-title"><span><?= __('Current Statement'); ?></span></div>
+    <div class="block-content">
+        <div class="actions-toolbar">
+            <div class="primary">
+                <a href="<?= $block->getUrl('customerportal/portal/overview') . '?pdf=statement'; ?>"
+                   class="action primary">
+                    <span>
+                        <?= __('Download Statement'); ?>
+                    </span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="block">
+    <div class="block-content">
+        <div class="box">
+            <div class="block-title">
+                <span><?= __('Recent Sales Orders'); ?></span>
+                <?php if (is_array($recentOrders)): ?>
+                    <a class="action" href="<?= $block->getUrl('customerportal/portal/orders'); ?>">
+                        <span><?= __('View All') ?></span>
+                    </a>
+                <?php endif; ?>
+            </div>
+            <div class="box-content">
+                <?php if (is_array($recentOrders)): ?>
+                    <div class="table-wrapper orders-recent">
+                        <table class="data table">
+                            <thead>
+                            <tr>
+                                <th class="col"><?= __('Sales Order ID'); ?></th>
+                                <th class="col"><?= __('Effective Date'); ?></th>
+                                <th class="col"><?= __('Order Value'); ?></th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($recentOrders as $recentOrder): ?>
+                                <tr>
+                                    <td class="col">
+                                        <a href="<?= $block->getUrl('customerportal/portal/orders') . '?id=' . $recentOrder->SalesOrderId; ?>">
+                                            <?= $recentOrder->SalesOrderId; ?>
+                                        </a>
+                                    </td>
+                                    <td class="col">
+                                        <?= date('M d Y', strtotime($recentOrder->OrderDate)); ?>
+                                    </td>
+                                    <td class="col">
+                                        <?= $currencySymbol . number_format((float)$recentOrder->TotalOrderValue, 2, '.', ','); ?>
+                                    </td>
+                                    <td>
+                                        <a href="<?= $block->getUrl('customerportal/portal/overview') . '?pdf=salesorder&salesorderid=' . $recentOrder->SalesOrderId; ?>"
+                                           class="wmn-icon-link">
+                                            <span class="wmn-icon wmn-print" aria-hidden="true"></span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="message info">
+                    <span>
+                        <?= __('There are no orders to display.'); ?>
+                    </span>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="box">
+            <div class="block-title">
+                <span><?= __('Recent Sales Invoices'); ?></span>
+                <?php if (is_array($recentInvoices)): ?>
+                    <a class="action" href="<?= $block->getUrl('customerportal/portal/invoices'); ?>">
+                        <span><?= __('View All') ?></span>
+                    </a>
+                <?php endif; ?>
+            </div>
+            <div class="box-content">
+                <?php if (is_array($recentInvoices)): ?>
+                    <div class="table-wrapper orders-recent">
+                        <table class="data table">
+                            <thead>
+                            <tr>
+                                <th class="col"><?= __('Sales Invoice ID'); ?></th>
+                                <th class="col"><?= __('Effective Date'); ?></th>
+                                <th class="col"><?= __('Invoice Value'); ?></th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($recentInvoices as $recentInvoice): ?>
+                                <tr>
+                                    <td class="col">
+                                        <a href="<?= $block->getUrl('customerportal/portal/invoices') . '?id=' . $recentInvoice->InvoiceId; ?>">
+                                            <?= $recentInvoice->InvoiceId; ?>
+                                        </a>
+                                    </td>
+                                    <td class="col">
+                                        <?= date('M d Y', strtotime($recentInvoice->Date)); ?>
+                                    </td>
+                                    <td class="col">
+                                        <?= $currencySymbol . number_format((float)$recentInvoice->Debit, 2, '.', ','); ?>
+                                    </td>
+                                    <td>
+                                        <a href="<?= $block->getUrl('customerportal/portal/overview') . '?pdf=salesinvoice&salesinvoiceid=' . $recentInvoice->InvoiceId; ?>"
+                                           class="wmn-icon-link">
+                                            <span class="wmn-icon wmn-print" aria-hidden="true"></span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="message info">
+                    <span>
+                        <?= __('There are no invoices to display.'); ?>
+                    </span>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>

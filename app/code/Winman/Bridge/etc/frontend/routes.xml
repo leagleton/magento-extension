@@ -4,5 +4,8 @@
         <route id="requestaccount" frontName="requestaccount">
             <module name="Winman_Bridge"/>
         </route>
+        <route id="customerportal" frontName="customerportal">
+            <module name="Winman_Bridge"/>
+        </route>
     </router>
 </config>

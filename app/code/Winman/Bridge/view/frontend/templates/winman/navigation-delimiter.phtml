@@ -1,0 +1,13 @@
+<?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
+
+/** @var \Winman\Bridge\Block\NavigationDelimiter $block */
+?>
+<?php if ($block->isWinmanCustomer()): ?>
+    <li class="nav item">
+        <span class="delimiter"></span>
+    </li>
+    <h3>WinMan Customer Portal</h3>
+<?php endif; ?>

@@ -1,0 +1,390 @@
+<?php
+/**
+ * @author Lynn Eagleton <support@winman.com>
+ */
+
+/** @var \Winman\Bridge\Block\Quotes $block */
+
+$id = $block->getRequest()->getParam('id');
+$quotes = $block->getQuotes($id);
+?>
+<?php if (isset($id)): ?>
+    <?php if (is_array($quotes)): ?>
+        <?php $quote = $quotes[0]; ?>
+        <div class="block">
+            <div class="block-title">
+                <span>
+                    <?= __('Quote') . ' - ' . $quote->QuoteId; ?>
+                </span>
+                <div class="primary wmn-view-all">
+                    <a href="<?= $block->getUrl('customerportal/portal/quotes'); ?>"
+                       class="action primary">
+                        <span>
+                            <?= __('View All Quotes'); ?>
+                        </span>
+                    </a>
+                </div>
+            </div>
+            <div class="block-content">
+                <div class="box">
+                    <strong class="box-title"><span><?= __('Company Address'); ?></span></strong>
+                    <p class="wmn-address">
+                        <span>
+                            <?= $quote->BillingName; ?>
+                        </span>
+                        <span>
+                            <?= str_replace('&#xD;&#xA;', '<br/>', $quote->BillingAddress); ?>
+                        </span>
+                        <span>
+                            <?= $quote->BillingCity; ?>
+                        </span>
+                        <span>
+                            <?= $quote->BillingPostalCode; ?>
+                        </span>
+                        <span>
+                            <?= $block->getCountryName($quote->BillingCountryCode); ?>
+                        </span>
+                    </p>
+                </div>
+                <div class="box">
+                    <strong class="box-title"><span><?= __('Shipping Address'); ?></span></strong>
+                    <p class="wmn-address">
+                        <span>
+                            <?= $quote->ShippingName; ?>
+                        </span>
+                        <span>
+                            <?= str_replace('&#xD;&#xA;', '<br/>', $quote->ShippingAddress); ?>
+                        </span>
+                        <span>
+                            <?= $quote->ShippingCity; ?>
+                        </span>
+                        <span>
+                            <?= $quote->ShippingPostalCode; ?>
+                        </span>
+                        <span>
+                            <?= $block->getCountryName($quote->ShippingCountryCode); ?>
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="block">
+            <div class="block-content">
+                <div class="box">
+                    <strong class="box-title"><span><?= __('Quote Details'); ?></span></strong>
+                    <div class="box-content">
+                        <div class="box wmn-box">
+                            <div class="box-content">
+                                <span>
+                                    <?= __('Quote ID') . ':&nbsp;'; ?>
+                                </span>
+                                <span>
+                                    <?= __('Quote Date') . ':&nbsp;'; ?>
+                                </span>
+                                <span>
+                                    <?= __('Status') . ':&nbsp;'; ?>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="box wmn-box">
+                            <div class="box-content">
+                                <span>
+                                    <?= $quote->QuoteId; ?>
+                                </span>
+                                <span>
+                                    <?= date('M d Y', strtotime($quote->QuoteDate)); ?>
+                                </span>
+                                <span>
+                                    <?= $quote->QuoteStatus; ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="box">
+                    <div class="box-content">
+                        <div class="actions-toolbar">
+                            <div class="primary wmn-print-order">
+                                <a href="<?= $block->getUrl('customerportal/portal/overview') . '?pdf=quote&quoteid=' . $quote->QuoteId; ?>"
+                                   class="action primary">
+                                    <span>
+                                        <?= __('Print Quote'); ?>
+                                    </span>
+                                </a>
+                                <?php if ($quote->QuoteStatus === 'Active'): ?>
+                                    <a href="<?= $block->getUrl('customerportal/portal/quotes') . '?action=convertquote&quoteid=' . $quote->QuoteId . '&reference=' . $quote->CustomerOrderNumber; ?>"
+                                       class="action primary">
+                                        <span>
+                                            <?= __('Convert to Order'); ?>
+                                        </span>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="block">
+            <div class="block-content">
+                <strong class="box-title"><span><?= __('Quote Items'); ?></span></strong>
+                <div class="box-content">
+                    <?php if (is_array($quote->OrderItems)): ?>
+                        <div class="table-wrapper">
+                            <table class="data table wmn-table">
+                                <thead>
+                                <tr>
+                                    <th class="col"><?= __('Quantity'); ?></th>
+                                    <th class="col"><?= __('Item'); ?></th>
+                                    <th class="col"><?= __('Cost'); ?></th>
+                                    <th class="col"><?= __('Line Cost'); ?></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php $quote->OrderItems = $block->sortItems($quote->OrderItems); ?>
+                                <?php foreach ($quote->OrderItems as $item): ?>
+                                    <tr>
+                                        <td class="col">
+                                            <?= $item->Quantity; ?>
+                                        </td>
+                                        <td class="col">
+                                            <?php if (isset($item->FreightMethodId)): ?>
+                                                <?= __('Shipping') . '<br/>' . $item->Description; ?>
+                                            <?php elseif (isset($item->FreeTextItem)): ?>
+                                                <?= $item->FreeTextItem . '<br/>' . $item->Description; ?>
+                                            <?php elseif (isset($item->SundryId)): ?>
+                                                <?= $item->SundryId . '<br/>' . $item->Description; ?>
+                                            <?php else: ?>
+                                                <?= $item->Sku . '<br/>' . $item->ProductName; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="col">
+                                            <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)$item->UnitPrice, 2, '.', ','); ?>
+                                        </td>
+                                        <td class="col">
+                                            <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)($item->LineValue - $item->LineTaxValue), 2, '.', ','); ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="message info">
+                            <span>
+                                <?= __('There are no items to display.'); ?>
+                            </span>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <div class="block">
+            <div class="block-content">
+                <div class="wmn-totals">
+                    <div class="box wmn-box">
+                        <div class="box-content">
+                            <span>
+                                <?= __('Subtotal') . ':&nbsp;'; ?>
+                            </span>
+                            <span>
+                                <?= __('Tax') . ':&nbsp;'; ?>
+                            </span>
+                            <span>
+                                <?= __('Quote Total') . ':&nbsp;'; ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="box wmn-box">
+                        <div class="box-content">
+                            <span>
+                                <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)($quote->TotalQuoteValue - $quote->TotalTaxValue), 2, '.', ','); ?>
+                            </span>
+                            <span>
+                                <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)$quote->TotalTaxValue, 2, '.', ','); ?>
+                            </span>
+                            <span>
+                                <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)$quote->TotalQuoteValue, 2, '.', ','); ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="block">
+            <div class="block-title">
+                <span>
+                    <?= __('Quote') . ' - ' . $id; ?>
+                </span>
+                <div class="primary wmn-view-all">
+                    <a href="<?= $block->getUrl('customerportal/portal/quotes'); ?>"
+                       class="action primary">
+                        <span>
+                            <?= __('View All Quotes'); ?>
+                        </span>
+                    </a>
+                </div>
+            </div>
+            <div class="block-content">
+                <div class="message info">
+                    <span>
+                        <?= __('Could not find quote with ID') . '&nbsp;' . $id; ?>
+                    </span>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+<?php else: ?>
+    <div class="block">
+        <div class="block-title"><span><?= __('Quotes'); ?></span></div>
+        <div class="block-content">
+            <?php if (is_array($quotes)): ?>
+                <div class="table-wrapper orders-recent">
+                    <table class="data table">
+                        <thead>
+                        <tr>
+                            <th class="col"><?= __('Quote ID'); ?></th>
+                            <th class="col"><?= __('Quote Date'); ?></th>
+                            <th class="col"><?= __('Reference'); ?></th>
+                            <th class="col"><?= __('Total Value'); ?></th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($quotes as $quote): ?>
+                            <tr>
+                                <td class="col">
+                                    <a href="<?= $block->getUrl('customerportal/portal/quotes') . '?id=' . $quote->QuoteId; ?>">
+                                        <?= $quote->QuoteId; ?>
+                                    </a>
+                                </td>
+                                <td class="col">
+                                    <?= date('M d Y', strtotime($quote->QuoteDate)); ?>
+                                </td>
+                                <td class="col">
+                                    <?= $quote->CustomerOrderNumber; ?>
+                                </td>
+                                <td class="col">
+                                    <?= $block->getCurrencySymbol($quote->Currency) . number_format((float)$quote->TotalQuoteValue, 2, '.', ','); ?>
+                                </td>
+                                <td>
+                                    <a href="<?= $block->getUrl('customerportal/portal/overview') . '?pdf=quote&quoteid=' . $quote->QuoteId; ?>"
+                                       class="wmn-icon-link">
+                                        <span class="wmn-icon wmn-print" aria-hidden="true"></span>
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="toolbar bottom">
+                    <div class="pager">
+                        <p class="toolbar-amount">
+                        <span class="toolbar-number">
+                            <?= __('Showing items %1 to %2 of %3 total', $block->getPageStart(), $block->getPageEnd(), $block->getTotalCount()); ?>
+                        </span>
+                        </p>
+                        <?php if ($block->getTotalPages() > 1): ?>
+                            <div class="pages">
+                                <strong class="label pages-label" id="paging-label"><?= __('Page'); ?></strong>
+                                <ul class="items pages-items" aria-labelledby="paging-label">
+                                    <?php if ($block->getPage() > 1): ?>
+                                        <li class="item pages-item-previous">
+                                            <a class="action previous" href="<?= $block->getPreviousUrl(); ?>"
+                                               title="<?= __('Previous'); ?>">
+                                                <span class="label"><?= __('Page'); ?></span>
+                                                <span><?= __('Previous'); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php if ($block->showJumpBack()): ?>
+                                        <li class="item">
+                                            <a class="page" href="<?= $block->getPageUrl(1); ?>">
+                                                <span class="label"><?= __('Page'); ?></span>
+                                                <span>1</span>
+                                            </a>
+                                        </li>
+                                        <li class="item">
+                                            <a class="page previous jump" href="<?= $block->getJumpBackUrl(); ?>">
+                                                <span>...</span>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php foreach ($block->getVisiblePages() as $_page): ?>
+                                        <?php if ($block->getPage() == $_page): ?>
+                                            <li class="item current">
+                                                <strong class="page">
+                                                    <span class="label"><?= __('You\'re currently reading page'); ?></span>
+                                                    <span><?= $_page; ?></span>
+                                                </strong>
+                                            </li>
+                                        <?php else: ?>
+                                            <li class="item">
+                                                <a href="<?= $block->getPageUrl($_page); ?>" class="page">
+                                                    <span class="label"><?= __('Page'); ?></span>
+                                                    <span><?= $_page; ?></span>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <?php if ($block->showJumpAhead()): ?>
+                                        <li class="item">
+                                            <a class="page next jump" href="<?= $block->getJumpAheadUrl(); ?>">
+                                                <span>...</span>
+                                            </a>
+                                        </li>
+                                        <li class="item">
+                                            <a class="page" href="<?= $block->getPageUrl($block->getTotalPages()); ?>">
+                                                <span class="label"><?= __('Page'); ?></span>
+                                                <span><?= $block->getTotalPages(); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php if ($block->getPage() < $block->getTotalPages()): ?>
+                                        <li class="item pages-item-next">
+                                            <a class="action next" href="<?= $block->getNextUrl(); ?>"
+                                               title="<?= __('Next'); ?>">
+                                                <span class="label"><?= __('Page'); ?></span>
+                                                <span><?= __('Next'); ?></span>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
+                        <div class="limiter">
+                            <strong class="limiter-label"><?= __('Show'); ?></strong>
+                            <select id="limiter" class="limiter-options">
+                                <option value="<?= $block->getSizeUrl(10); ?>"<?= $block->getSelectedStatus(10); ?>>
+                                    10
+                                </option>
+                                <option value="<?= $block->getSizeUrl(20); ?>"<?= $block->getSelectedStatus(20); ?>>
+                                    20
+                                </option>
+                                <option value="<?= $block->getSizeUrl(50); ?>"<?= $block->getSelectedStatus(50); ?>>
+                                    50
+                                </option>
+                            </select>
+                            <span class="limiter-text"><?= __('per page'); ?></span>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="message info">
+                    <span>
+                        <?= __('There are no quotes to display.'); ?>
+                    </span>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <script type="text/javascript">
+      var elem = document.getElementById('limiter');
+
+      elem.onchange = function () {
+        window.location.href = elem.value;
+      }
+    </script>
+<?php endif; ?>
